@@ -26,13 +26,38 @@ function Get-Sheet($id,$gid,$out){
   (New-Object System.Net.WebClient).DownloadFile($url,$out)
   if((Get-Item $out).Length -lt 30){ throw "Download muito pequeno: $out" }
 }
-Add-Type -AssemblyName Microsoft.VisualBasic
 function Read-Csv($path){
   $rows = New-Object System.Collections.Generic.List[object]
-  $p = New-Object Microsoft.VisualBasic.FileIO.TextFieldParser($path,[System.Text.Encoding]::UTF8)
-  $p.TextFieldType='Delimited'; $p.SetDelimiters(','); $p.HasFieldsEnclosedInQuotes=$true
-  while(-not $p.EndOfData){ $rows.Add($p.ReadFields()) }
-  $p.Close(); return $rows
+  try {
+    Add-Type -AssemblyName Microsoft.VisualBasic -ErrorAction Stop
+    $p = New-Object Microsoft.VisualBasic.FileIO.TextFieldParser($path,[System.Text.Encoding]::UTF8)
+    $p.TextFieldType='Delimited'; $p.SetDelimiters(','); $p.HasFieldsEnclosedInQuotes=$true
+    while(-not $p.EndOfData){ $rows.Add($p.ReadFields()) }
+    $p.Close(); return $rows
+  } catch {
+    # Fallback portatil (Linux/pwsh): gviz aspa todo campo; assume sem newline embutido na celula.
+    $lines = [IO.File]::ReadAllLines($path,[System.Text.Encoding]::UTF8)
+    foreach($ln in $lines){
+      if($ln.Length -eq 0){ continue }
+      $fields = New-Object System.Collections.Generic.List[string]
+      $sb = New-Object Text.StringBuilder; $inq=$false; $i=0
+      while($i -lt $ln.Length){
+        $ch=$ln[$i]
+        if($inq){
+          if($ch -eq '"'){ if($i+1 -lt $ln.Length -and $ln[$i+1] -eq '"'){ [void]$sb.Append('"'); $i++ } else { $inq=$false } }
+          else { [void]$sb.Append($ch) }
+        } else {
+          if($ch -eq '"'){ $inq=$true }
+          elseif($ch -eq ','){ $fields.Add($sb.ToString()); [void]$sb.Clear() }
+          else { [void]$sb.Append($ch) }
+        }
+        $i++
+      }
+      $fields.Add($sb.ToString())
+      $rows.Add($fields.ToArray())
+    }
+    return $rows
+  }
 }
 function Norm($s){ if($null -eq $s){return ''}; return ($s -replace [char]0x200b,'').Trim() }
 function MoneyBR($s){ $s=Norm $s; if($s -eq ''){return 0.0}; return [double]($s -replace '\.','' -replace ',','.') }
@@ -173,7 +198,13 @@ $bySource=@(
 )
 
 $nowIso=(Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
-$nowBR=[System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow,'E. South America Standard Time').ToString('dd/MM/yyyy HH:mm')
+function NowBR(){
+  foreach($tz in @('E. South America Standard Time','America/Sao_Paulo')){
+    try { return [System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow,$tz).ToString('dd/MM/yyyy HH:mm') } catch {}
+  }
+  return [DateTime]::UtcNow.AddHours(-3).ToString('dd/MM/yyyy HH:mm')
+}
+$nowBR=NowBR
 $utf8=[System.Text.UTF8Encoding]::new($false)
 
 $payload=[pscustomobject]@{

@@ -16,14 +16,14 @@ concurrency:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build data.js (leads x queries do Meta)
-        shell: powershell
-        run: powershell -ExecutionPolicy Bypass -File .\build.ps1 -Mode all
+        shell: pwsh
+        run: pwsh -File ./build.ps1 -Mode all
       - name: Commit data.js se mudou
-        shell: powershell
+        shell: pwsh
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
