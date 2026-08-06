@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>SIP · S1 — Dashboard de Captação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>document.write('<link rel="stylesheet" href="styles.css?t='+Date.now()+'">');</script>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="editband">Funil de Captação · SIP-S1 · Meta Ads</div>
+
+  <header class="top">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="sg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#67e8f9"/><stop offset="1" stop-color="#8b7cf0"/>
+          </linearGradient>
+        </defs>
+        <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#sg)" opacity="0.14"/>
+        <rect x="4.5" y="4.5" width="55" height="55" rx="15.5" stroke="url(#sg)" stroke-opacity="0.5"/>
+        <path d="M14 40 L24 40 L30 20 L37 46 L43 30 L50 30" fill="none" stroke="url(#sg)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="50" cy="30" r="3.6" fill="#67e8f9"/>
+      </svg>
+      <div>
+        <div class="logo"><span class="sip">SIP</span><span class="s1">S1</span></div>
+        <div class="brand-tag">Dashboard de Captação de Leads · Meta Ads</div>
+      </div>
+    </div>
+    <div class="top-right">
+      <div class="updated">Atualizado <b id="updated">—</b><span class="live">● ao vivo</span></div>
+      <div class="periods" id="periods"></div>
+    </div>
+  </header>
+
+  <div class="coverage" id="coverage"></div>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="funil">Funil &amp; Otimização</button>
+    <button class="tab" data-tab="leads">Leads · Visão Geral</button>
+  </nav>
+
+  <!-- ============ FUNIL ============ -->
+  <section class="panel-tab" id="tab-funil">
+    <div class="funil-grid">
+      <div class="kpi-col" id="kpiCol"></div>
+      <div class="chart-col">
+        <div class="card"><div class="card-h">Leads por dia <span class="hint">barras = leads captados · <b>ciano</b> pago · <b>violeta</b> orgânico</span></div><div id="chartLeads"></div></div>
+        <div class="card"><div class="card-h">Investimento x CPL por dia <span class="hint">barras = gasto c/ imposto · linha = custo por lead</span></div><div id="chartInvest"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Visão diária <span class="hint">uma linha por dia (mais recente no topo) · cor mais forte = maior no período · CPL e CPM verde (bom) → vermelho (caro)</span></div>
+      <div class="table-scroll"><table class="tbl" id="dailyTbl"></table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Otimização — Campanha › Conjunto › Anúncio
+        <span class="hint">clique numa <b>campanha</b> p/ abrir os conjuntos, e num <b>conjunto</b> p/ abrir os anúncios · veja de onde vêm os leads</span></div>
+      <div class="tree-legend" id="treeLegend"></div>
+      <div class="table-scroll"><table class="tbl tree" id="treeTbl"></table></div>
+    </div>
+  </section>
+
+  <!-- ============ LEADS · VISÃO GERAL ============ -->
+  <section class="panel-tab hidden" id="tab-leads">
+    <div class="card">
+      <div class="card-h">Retrato da captação <span class="hint">todos os leads reais da planilha (exclui testes) · base completa</span></div>
+      <div class="verdict" id="verdict"></div>
+    </div>
+
+    <div id="leadsStats"></div>
+
+    <div class="row-2">
+      <div class="card">
+        <div class="card-h">Pago x Orgânico <span class="hint">de onde vêm os leads</span></div>
+        <div id="thermoSrc"></div>
+        <div class="table-scroll"><table class="tbl" id="sourceTbl"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-h">Canais de origem <span class="hint">utm_source de cada lead</span></div>
+        <div id="channelBars"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Distribuição geográfica <span class="hint">estado de cada lead (por IP) · top 14</span></div>
+      <div id="geoBars"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Ranking de anúncios por leads <span class="hint">onde investir para trazer mais lead · só tráfego rastreado</span></div>
+      <div class="table-scroll"><table class="tbl" id="adRankTbl"></table></div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>SIP-S1 · dados agregados, somente leitura · imposto Meta ×<b id="taxf">1,1385</b> incluso no investimento e nas métricas · leads de teste (e-mail interno, source/medium "teste") são ignorados</span>
+  </footer>
+</div>
+
+<script>document.write('<script src="data.js?t='+Date.now()+'"><\/script>');</script>
+<script>document.write('<script src="app.js?t='+Date.now()+'"><\/script>');</script>
+</body>
+</html>
