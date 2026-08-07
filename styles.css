@@ -163,6 +163,14 @@ b{font-weight:700}
 .qbar-track.vi span{background:linear-gradient(90deg,#6d5de0,var(--vi2))}
 .qbar-track.gr span{background:linear-gradient(90deg,#1f9c73,var(--good))}
 
+/* ---------- pesquisa & grupos ---------- */
+.rate-hero{display:flex;align-items:baseline;gap:14px;margin-bottom:10px;flex-wrap:wrap}
+.rate-hero .rh-val{font-size:40px;font-weight:700;letter-spacing:-1.5px;line-height:1}
+.rate-hero .rh-det{font-size:12px;color:var(--muted);line-height:1.5}
+.rate-hero .rh-det b{color:var(--ink2);font-weight:700}
+.rate-hero.cy .rh-val{color:var(--cy2)} .rate-hero.gr .rh-val{color:var(--good)}
+.stat.resp .s-v{color:var(--cy2)} .stat.grp .s-v{color:var(--good)}
+
 .foot{color:var(--muted2);font-size:11.5px;text-align:center;margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
 .foot b{color:var(--muted)}
 .empty{color:var(--muted2);font-size:12.5px;padding:14px 2px;text-align:center}

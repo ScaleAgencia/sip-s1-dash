@@ -294,6 +294,65 @@ function renderAdRank(){
   el('adRankTbl').innerHTML=head+'<tbody>'+body+'</tbody>';
 }
 
+/* =================== PESQUISA & GRUPOS =================== */
+function renderRateChart(elId, rows, getBar, getRate, barColor, barName){
+  var W=600,H=210,pl=32,pr=46,pt=12,pb=22,pw=W-pl-pr,ph=H-pt-pb,base=pt+ph;
+  var maxB=Math.max.apply(null,rows.map(getBar).concat([1]));
+  var maxR=Math.max.apply(null,rows.map(getRate).concat([0.01]));
+  var n=rows.length||1,gw=pw/n,bw=Math.max(4,Math.min(26,gw*0.5));
+  var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
+  [0,0.5,1].forEach(function(f){ var y=pt+ph*(1-f); s+='<line x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'" stroke="#182034" stroke-dasharray="2 3"/>';
+    s+='<text x="'+(pl-4)+'" y="'+(y+3)+'" text-anchor="end" fill="#586a8c" font-size="9">'+Math.round(maxB*f)+'</text>';
+    s+='<text x="'+(W-pr+4)+'" y="'+(y+3)+'" text-anchor="start" fill="#c98a2a" font-size="9">'+Math.round(maxR*100*f)+'%</text>'; });
+  rows.forEach(function(r,i){ var xc=pl+gw*i+gw/2, bh=ph*dv(getBar(r),maxB);
+    if(getBar(r)>0) s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-bh).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+bh.toFixed(1)+'" rx="1.5" fill="'+barColor+'" fill-opacity="0.55"/>'; });
+  var pts=[]; rows.forEach(function(r,i){ var xc=pl+gw*i+gw/2, y=base-ph*dv(getRate(r),maxR); pts.push([xc,y]); });
+  if(pts.length>1){ var dpath='M'+pts.map(function(pp){return pp[0].toFixed(1)+' '+pp[1].toFixed(1);}).join(' L'); s+='<path d="'+dpath+'" fill="none" stroke="'+COL.warn+'" stroke-width="2"/>'; }
+  pts.forEach(function(pp){ s+='<circle cx="'+pp[0].toFixed(1)+'" cy="'+pp[1].toFixed(1)+'" r="2.6" fill="'+COL.warn+'"/>'; });
+  xticks(rows).forEach(function(i){ var xc=pl+gw*i+gw/2; s+='<text x="'+xc.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" fill="#586a8c" font-size="9">'+fmtBR(rows[i].date)+'</text>'; });
+  s+=hitRects(rows,pl,gw,pt,ph)+'</svg>';
+  el(elId).innerHTML='<div class="chart">'+s+'</div><div class="chart-legend"><span><span class="dot" style="background:'+barColor+';opacity:.6"></span>'+barName+'/dia</span><span><span class="ln" style="background:'+COL.warn+'"></span>Taxa (÷ leads)</span></div>';
+  bindHits(elId, rows, function(r){
+    return '<div class="tt-d">'+fmtBR(r.date)+'</div>'
+      +'<div class="tt-r"><span style="color:'+barColor+'">'+barName+'</span><b>'+intf(getBar(r))+'</b></div>'
+      +'<div class="tt-r"><span style="color:'+COL.warn+'">Taxa</span><b>'+pct(dv(getBar(r),r.leads)*100)+'</b></div>'
+      +'<div class="tt-sub">Leads no dia '+intf(r.leads)+'</div>';
+  });
+}
+function renderEngTable(rows){
+  var head='<thead><tr><th>Dia</th><th>Leads</th><th>Respostas</th><th>Taxa resp.</th><th>Entraram</th><th>Saíram</th><th>Líquido grupos</th><th>Taxa grupos</th></tr></thead>';
+  var body=rows.slice().sort(function(a,b){return b.date.localeCompare(a.date);}).map(function(r){ var net=r.groupIn-r.groupOut;
+    return '<tr><td>'+fmtBR(r.date)+'</td>'
+      +'<td class="num">'+intf(r.leads)+'</td>'
+      +'<td class="num chip-pago">'+(r.survey||'·')+'</td>'
+      +'<td class="num">'+(r.leads?pct(dv(r.survey,r.leads)*100):'—')+'</td>'
+      +'<td class="num" style="color:var(--good)">'+intf(r.groupIn)+'</td>'
+      +'<td class="num" style="color:var(--bad)">'+(r.groupOut||'·')+'</td>'
+      +'<td class="num">'+intf(net)+'</td>'
+      +'<td class="num">'+(r.leads?pct(dv(r.groupIn,r.leads)*100):'—')+'</td></tr>'; }).join('');
+  if(!rows.length) body='<tr><td colspan="8" class="empty">Sem dados.</td></tr>';
+  el('engTbl').innerHTML=head+'<tbody>'+body+'</tbody>';
+}
+function mountEngage(){
+  var E=D.engage||{}, sv=E.survey||{}, gp=E.groups||{}, rows=arr(E.byDay), leads=E.leads||0;
+  var svRate=dv(sv.completed,leads), gpRate=dv(gp.entered,leads);
+  el('engStats').innerHTML='<div class="stat-row" style="grid-template-columns:repeat(3,1fr)">'
+    +'<div class="stat"><div class="s-v">'+intf(leads)+'</div><div class="s-l">Leads captados</div></div>'
+    +'<div class="stat resp"><div class="s-v">'+intf(sv.completed)+'</div><div class="s-l">Respostas de pesquisa</div></div>'
+    +'<div class="stat grp"><div class="s-v">'+intf(gp.net)+'</div><div class="s-l">Pessoas nos grupos</div></div></div>';
+  var sh=el('surveyHero'); sh.className='rate-hero cy';
+  sh.innerHTML='<span class="rh-val">'+pct(svRate*100)+'</span>'
+    +'<span class="rh-det"><b>'+intf(sv.completed)+'</b> respostas completas de <b>'+intf(leads)+'</b> leads'+(sv.incomplete?' · '+intf(sv.incomplete)+' incompletas':'')
+    +'<br>'+intf(sv.respondedLeads)+' leads distintos responderam <b>('+pct(dv(sv.respondedLeads,sv.distinctLeads)*100)+' dos leads)</b></span>';
+  renderRateChart('chartSurvey', rows, function(r){return r.survey;}, function(r){return dv(r.survey,r.leads);}, COL.cy, 'Respostas');
+  var gh=el('groupHero'); gh.className='rate-hero gr';
+  gh.innerHTML='<span class="rh-val">'+pct(gpRate*100)+'</span>'
+    +'<span class="rh-det"><b>'+intf(gp.entered)+'</b> entradas de <b>'+intf(leads)+'</b> leads'
+    +'<br>'+intf(gp.entered)+' entraram · '+intf(gp.left)+' saíram · <b>'+intf(gp.net)+'</b> ativos no grupo</span>';
+  renderRateChart('chartGroup', rows, function(r){return r.groupIn;}, function(r){return dv(r.groupIn,r.leads);}, COL.good, 'Entradas');
+  renderEngTable(rows);
+}
+
 /* =================== CHROME =================== */
 function periodsHTML(){
   return PRESETS.map(function(p){return '<button data-k="'+p.k+'" class="pbtn">'+p.label+'</button>';}).join('')
@@ -322,7 +381,7 @@ function initPeriods(){
 }
 function renderAll(){ var rng=rangeFor(period), a=aggDaily(rng), p=aggDaily(prevRange(rng)), days=daysInRange(rng);
   renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderDaily(rng); renderTree(rng); }
-var TABS=['funil','leads'];
+var TABS=['funil','leads','engaje'];
 function activateTab(id){ Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(x){x.classList.toggle('active',x.getAttribute('data-tab')===id);});
   TABS.forEach(function(k){ el('tab-'+k).classList.toggle('hidden',k!==id); }); }
 function initTabs(){ Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(t){ t.addEventListener('click',function(){ var id=t.getAttribute('data-tab'); activateTab(id); if(history.replaceState)history.replaceState(null,'','#'+id); }); });
@@ -338,5 +397,5 @@ function initCoverage(){ el('updated').textContent=D.generatedAtBR||'—'; el('t
   el('coverage').innerHTML=msg; }
 
 if(!daily.length && !grain.length){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
-else { initCoverage(); initPeriods(); initTabs(); renderAll(); mountLeads(); }
+else { initCoverage(); initPeriods(); initTabs(); renderAll(); mountLeads(); mountEngage(); }
 })();

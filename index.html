@@ -44,6 +44,7 @@
   <nav class="tabs" id="tabs">
     <button class="tab active" data-tab="funil">Funil &amp; Otimização</button>
     <button class="tab" data-tab="leads">Leads · Visão Geral</button>
+    <button class="tab" data-tab="engaje">Pesquisa &amp; Grupos</button>
   </nav>
 
   <!-- ============ FUNIL ============ -->
@@ -98,6 +99,29 @@
     <div class="card">
       <div class="card-h">Ranking de anúncios por leads <span class="hint">onde investir para trazer mais lead · só tráfego rastreado</span></div>
       <div class="table-scroll"><table class="tbl" id="adRankTbl"></table></div>
+    </div>
+  </section>
+
+  <!-- ============ PESQUISA & GRUPOS ============ -->
+  <section class="panel-tab hidden" id="tab-engaje">
+    <div id="engStats"></div>
+
+    <div class="row-2">
+      <div class="card eng-card">
+        <div class="card-h">Taxa de resposta da pesquisa <span class="hint">respostas completas ÷ leads · barras = respostas/dia · linha = taxa/dia</span></div>
+        <div class="rate-hero" id="surveyHero"></div>
+        <div id="chartSurvey"></div>
+      </div>
+      <div class="card eng-card">
+        <div class="card-h">Taxa de entrada nos grupos <span class="hint">entradas ÷ leads · barras = entradas/dia · linha = taxa/dia</span></div>
+        <div class="rate-hero" id="groupHero"></div>
+        <div id="chartGroup"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Resumo diário <span class="hint">leads, respostas de pesquisa e movimentação dos grupos por dia</span></div>
+      <div class="table-scroll"><table class="tbl" id="engTbl"></table></div>
     </div>
   </section>
 

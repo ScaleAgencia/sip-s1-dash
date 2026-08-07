@@ -144,7 +144,7 @@ foreach($r in $qd){ $d=Norm $r[$Q_DAY]; if($d -notmatch '^\d{4}-\d{2}-\d{2}$'){c
 # ---- leads: filtra teste, classifica origem e atribui --------------
 $SENT='SEM_RASTREIO'
 $leadRows=New-Object System.Collections.Generic.List[object]
-$dState=@{}; $dCity=@{}; $dChannel=@{}
+$dState=@{}; $dCity=@{}; $dChannel=@{}; $leadMails=@{}
 $nTest=0
 function Bump($h,$k){ if($null -eq $k -or $k -eq ''){return}; if(-not $h.ContainsKey($k)){$h[$k]=0}; $h[$k]++ }
 
@@ -172,7 +172,74 @@ foreach($r in $ld){
   if($d -ne 'sem-data'){ $o=GetDay $d; $o.leads++; if($paid){ $o.leadsPaid++ } }
   $g=GetGrain $d $cName $sName $aName; $g.leads++
   Bump $dState $stt; Bump $dCity $cty; Bump $dChannel $chan
+  $em=$mail.ToLower(); if($em -ne ''){ $leadMails[$em]=$true }
   $leadRows.Add([pscustomobject]@{date=$d;paid=$paid;channel=$chan;state=$stt;camp=$cName;adset=$sName;ad=$aName})
+}
+
+# ===================================================================
+#  PESQUISA + GRUPOS  (aba engajamento)
+# ===================================================================
+function Get-SheetByName($id,$name,$out){
+  $enc=[uri]::EscapeDataString($name)
+  $url="https://docs.google.com/spreadsheets/d/$id/gviz/tq?tqx=out:csv&sheet=$enc"
+  [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
+  (New-Object System.Net.WebClient).DownloadFile($url,$out)
+}
+# leads reais por dia (p/ as taxas) — reaproveita o $daily ja calculado
+$leadsByDay=@{}; foreach($k in $daily.Keys){ if($k -match '^\d{4}-\d{2}-\d{2}$'){ $leadsByDay[$k]=[int]$daily[$k].leads } }
+
+# ---- PESQUISA (respostas por pessoa; cruza por e-mail) ----
+$survTotal=0; $survDone=0; $survInc=0; $survDoneByDay=@{}; $survAllByDay=@{}; $respMails=@{}
+try {
+  $pCsv=Join-Path $dataDir 'pesquisa.csv'; Get-SheetByName $LEADS_ID 'pesquisa' $pCsv
+  $pp=Read-Csv $pCsv; $ph=$pp[0]; $pdRows=$pp[1..($pp.Count-1)]
+  $P_MAIL=HdrLike $ph '*mail*'; $P_STATUS=HdrLike $ph 'status'; $P_DATE=HdrLike $ph 'date'
+  foreach($r in $pdRows){
+    if($null -eq $r -or $r.Count -eq 0){ continue }
+    $pm = if($P_MAIL -ge 0 -and $r.Count -gt $P_MAIL){ (Norm $r[$P_MAIL]).ToLower() } else { '' }
+    $pst= if($P_STATUS -ge 0 -and $r.Count -gt $P_STATUS){ Deaccent $r[$P_STATUS] } else { '' }
+    $pd = if($P_DATE -ge 0 -and $r.Count -gt $P_DATE){ LeadDate $r[$P_DATE] } else { '' }
+    if($pm -eq '' -and $pst -eq '' -and $pd -eq ''){ continue }
+    $done = ($pst -eq 'completed' -or $pst -eq 'complete')
+    $survTotal++; if($done){ $survDone++ } elseif($pst -eq 'incomplete'){ $survInc++ }
+    if($pm -ne ''){ $respMails[$pm]=$true }
+    if($pd -ne ''){ Bump $survAllByDay $pd; if($done){ Bump $survDoneByDay $pd } }
+  }
+} catch { Write-Host ("AVISO: aba pesquisa nao lida: "+$_.Exception.Message) }
+$respLeads=0; foreach($m in $respMails.Keys){ if($leadMails.ContainsKey($m)){ $respLeads++ } }
+
+# ---- GRUPOS (agregado diario: Data/Entrou/Saiu) ----
+$grpIn=0; $grpOut=0; $grpInByDay=@{}; $grpOutByDay=@{}
+try {
+  $gCsv=Join-Path $dataDir 'grupos.csv'; Get-SheetByName $LEADS_ID 'grupos' $gCsv
+  $gg=Read-Csv $gCsv; $gh=$gg[0]; $gdRows=$gg[1..($gg.Count-1)]
+  $G_DATA=HdrLike $gh 'data'; $G_IN=HdrLike $gh 'entrou'; $G_OUT=HdrLike $gh 'saiu'
+  foreach($r in $gdRows){
+    if($null -eq $r -or $r.Count -le $G_DATA){ continue }
+    $gd=LeadDate $r[$G_DATA]; if($gd -eq ''){ continue }
+    $ein = if($G_IN  -ge 0 -and $r.Count -gt $G_IN ){ ToInt $r[$G_IN]  } else { 0 }
+    $eout= if($G_OUT -ge 0 -and $r.Count -gt $G_OUT){ ToInt $r[$G_OUT] } else { 0 }
+    $grpIn+=$ein; $grpOut+=$eout
+    if(-not $grpInByDay.ContainsKey($gd)){ $grpInByDay[$gd]=0 }; $grpInByDay[$gd]+=$ein
+    if(-not $grpOutByDay.ContainsKey($gd)){ $grpOutByDay[$gd]=0 }; $grpOutByDay[$gd]+=$eout
+  }
+} catch { Write-Host ("AVISO: aba grupos nao lida: "+$_.Exception.Message) }
+
+# ---- serie diaria unificada (leads x pesquisa x grupos) ----
+$engDates = New-Object System.Collections.Generic.List[string]
+foreach($k in @($leadsByDay.Keys)+@($survDoneByDay.Keys)+@($survAllByDay.Keys)+@($grpInByDay.Keys)+@($grpOutByDay.Keys)){
+  if($k -match '^\d{4}-\d{2}-\d{2}$' -and ($engDates -notcontains $k)){ [void]$engDates.Add($k) }
+}
+$engByDay=@()
+foreach($k in ($engDates | Sort-Object)){
+  $engByDay += [pscustomobject]@{
+    date=$k
+    leads   = $(if($leadsByDay.ContainsKey($k)){$leadsByDay[$k]}else{0})
+    survey  = $(if($survDoneByDay.ContainsKey($k)){$survDoneByDay[$k]}else{0})
+    surveyAll = $(if($survAllByDay.ContainsKey($k)){$survAllByDay[$k]}else{0})
+    groupIn = $(if($grpInByDay.ContainsKey($k)){$grpInByDay[$k]}else{0})
+    groupOut= $(if($grpOutByDay.ContainsKey($k)){$grpOutByDay[$k]}else{0})
+  }
 }
 
 # ---- arrays finais -------------------------------------------------
@@ -213,6 +280,12 @@ $payload=[pscustomobject]@{
   leadDateMin=$(if($leadDates.Count){$leadDates[0]}else{''}); leadDateMax=$(if($leadDates.Count){$leadDates[-1]}else{''})
   totals=$tot; bySource=@($bySource)
   channels=(DistArr $dChannel); geo=(DistArr $dState); cities=(DistArr $dCity)
+  engage=[pscustomobject]@{
+    leads=$leadRows.Count
+    survey=[pscustomobject]@{ total=$survTotal; completed=$survDone; incomplete=$survInc; respondedLeads=$respLeads; distinctLeads=$leadMails.Count }
+    groups=[pscustomobject]@{ entered=$grpIn; left=$grpOut; net=($grpIn-$grpOut) }
+    byDay=@($engByDay)
+  }
   daily=@($dailyArr); grain=@($grainArr)
 }
 $json=$payload | ConvertTo-Json -Depth 9 -Compress
