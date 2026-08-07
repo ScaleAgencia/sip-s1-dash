@@ -131,7 +131,7 @@ function MatchName($val,$exactSet,$deMap){ $v=Norm $val; if($v -eq ''){return ''
 $daily=@{}
 function GetDay($d){ if(-not $daily.ContainsKey($d)){ $daily[$d]=[pscustomobject]@{date=$d;spend=0.0;impr=0;reach=0;clicks=0;lpv=0;metaLeads=0;leads=0;leadsPaid=0} }; return $daily[$d] }
 $grain=@{}
-function GetGrain($d,$c,$s,$a){ $key="$d`u$c`u$s`u$a"
+function GetGrain($d,$c,$s,$a){ $key=($d+[char]31+$c+[char]31+$s+[char]31+$a)
   if(-not $grain.ContainsKey($key)){ $grain[$key]=[pscustomobject]@{date=$d;campaign=$c;adset=$s;ad=$a;spend=0.0;impr=0;reach=0;clicks=0;lpv=0;metaLeads=0;leads=0} }
   return $grain[$key] }
 
