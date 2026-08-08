@@ -43,13 +43,23 @@ function rangeFor(k){
 }
 function prevRange(rng){ var len=daysBetween(rng[0],rng[1])+1; var pe=addDays(rng[0],-1); return [addDays(pe,-(len-1)), pe]; }
 
-var METS=['spend','impr','reach','clicks','lpv','metaLeads','leads','leadsPaid'];
-function aggDaily(rng){
-  var o={}; METS.forEach(function(k){o[k]=0;});
-  daily.forEach(function(d){ if(!inRange(d.date,rng))return; METS.forEach(function(k){o[k]+=(d[k]||0);}); });
-  return o;
+var channel='geral';   // geral | meta | google
+function chMatch(d){ return channel==='geral' || d.channel===channel; }
+var CHMETS=['spend','impr','reach','clicks','lpv','platLeads','leads','mLeads','gLeads'];
+function daysInRange(rng){
+  var map={};
+  daily.forEach(function(d){ if(!isDate(d.date)||!inRange(d.date,rng)||!chMatch(d)) return;
+    var o=map[d.date]; if(!o){ o={date:d.date}; CHMETS.forEach(function(k){o[k]=0;}); map[d.date]=o; }
+    o.spend+=d.spend||0;o.impr+=d.impr||0;o.reach+=d.reach||0;o.clicks+=d.clicks||0;o.lpv+=d.lpv||0;o.platLeads+=d.platLeads||0;o.leads+=d.leads||0;
+    if(d.channel==='meta')o.mLeads+=d.leads||0; else if(d.channel==='google')o.gLeads+=d.leads||0;
+  });
+  return Object.keys(map).sort().map(function(k){return map[k];});
 }
-function daysInRange(rng){ return daily.filter(function(d){return isDate(d.date)&&inRange(d.date,rng);}).sort(function(a,b){return a.date.localeCompare(b.date);}); }
+function aggDaily(rng){ var o={}; CHMETS.forEach(function(k){o[k]=0;});
+  daysInRange(rng).forEach(function(d){ CHMETS.forEach(function(k){o[k]+=(d[k]||0);}); }); return o; }
+function chLabel(){ return channel==='meta'?'Meta Ads':(channel==='google'?'Google Ads':'Geral (Meta + Google)'); }
+function hasReach(a){ return (a.reach||0)>0; }
+function hasLPV(a){ return (a.lpv||0)>0; }
 function median(xs){ var a=xs.filter(function(x){return x!=null&&isFinite(x);}).sort(function(x,y){return x-y;}); if(!a.length)return 0; var m=Math.floor(a.length/2); return a.length%2?a[m]:(a[m-1]+a[m])/2; }
 function relClass(v,med){ if(v==null||!isFinite(v)||v<=0||med<=0) return 'cpl-n'; var r=v/med; if(r<=0.85)return 'cpl-g'; if(r<=1.3)return 'cpl-a'; return 'cpl-r'; }
 
@@ -68,29 +78,37 @@ function kpiCard(hl,label,val,subs){
     +'<div class="kpi-sub">'+subs+'</div></div>';
 }
 function renderKpiCol(a, p){
-  var cpl=dv(a.spend,a.leads), org=a.leads-a.leadsPaid;
-  var hero='<div class="kpi-hero"><div class="h-lab">Investimento com imposto</div>'
+  var cpl=dv(a.spend,a.leads);
+  var heroLab = channel==='google' ? 'Investimento Google (sem imposto)'
+             : channel==='meta'   ? 'Investimento Meta (com imposto)'
+             : 'Investimento · Meta c/ imposto + Google s/ imposto';
+  var platLab = channel==='google' ? 'Conversões Google' : (channel==='meta' ? 'Leads pixel Meta' : 'Leads plataforma');
+  var hero='<div class="kpi-hero"><div class="h-lab">'+heroLab+'</div>'
     +'<div class="h-val">'+money(a.spend)+'</div>'
-    +'<div class="h-foot"><span>CPL geral <b>'+(a.leads?money(cpl):'—')+'</b></span>'
-    +'<span>Leads (pixel Meta) <b>'+intf(a.metaLeads)+'</b></span></div></div>';
+    +'<div class="h-foot"><span>CPL <b>'+(a.leads?money(cpl):'—')+'</b></span>'
+    +'<span>'+platLab+' <b>'+intf(a.platLeads)+'</b></span></div></div>';
 
   var cards='';
   cards+=kpiCard(false,'Impressões',intf(a.impr),
     subRow('CPM', money(dv(a.spend,a.impr)*1000), trendHTML(dv(a.spend,a.impr)*1000, dv(p.spend,p.impr)*1000, false))
     + subRow('CTR', pct(dv(a.clicks,a.impr)*100), trendHTML(dv(a.clicks,a.impr), dv(p.clicks,p.impr), true)));
-  cards+=kpiCard(false,'Alcance',intf(a.reach),
+  if(hasReach(a)) cards+=kpiCard(false,'Alcance'+(channel==='geral'?' <small style="color:var(--muted2)">(Meta)</small>':''),intf(a.reach),
     subRow('Frequência', nf1.format(dv(a.impr,a.reach))+'x', trendHTML(dv(a.impr,a.reach), dv(p.impr,p.reach), false))
     + subRow('Custo / mil alcançados', money(dv(a.spend,a.reach)*1000), trendHTML(dv(a.spend,a.reach)*1000, dv(p.spend,p.reach)*1000, false)));
-  cards+=kpiCard(false,'Cliques no link',intf(a.clicks),
+  cards+=kpiCard(false,'Cliques',intf(a.clicks),
     subRow('CPC', money(dv(a.spend,a.clicks)), trendHTML(dv(a.spend,a.clicks), dv(p.spend,p.clicks), false))
-    + subRow('Connect rate <small>(LP÷clique)</small>', pct(dv(a.lpv,a.clicks)*100), trendHTML(dv(a.lpv,a.clicks), dv(p.lpv,p.clicks), true)));
-  cards+=kpiCard(false,'Landing Page Views',intf(a.lpv),
+    + (hasLPV(a)? subRow('Connect rate <small>(LP÷clique)</small>', pct(dv(a.lpv,a.clicks)*100), trendHTML(dv(a.lpv,a.clicks), dv(p.lpv,p.clicks), true))
+                : subRow('CTR', pct(dv(a.clicks,a.impr)*100), '')));
+  if(hasLPV(a)) cards+=kpiCard(false,'Landing Page Views',intf(a.lpv),
     subRow('Custo/LPV', money(dv(a.spend,a.lpv)), trendHTML(dv(a.spend,a.lpv), dv(p.spend,p.lpv), false))
     + subRow('LPV → Lead', pct(dv(a.leads,a.lpv)*100), trendHTML(dv(a.leads,a.lpv), dv(p.leads,p.lpv), true)));
+  var originSub = channel==='geral'
+    ? subRow('Por canal', '<small><b class="chip-pago">'+intf(a.mLeads)+' Meta</b> · <b class="chip-org">'+intf(a.gLeads)+' Google</b></small>','')
+    : subRow('Conversão clique→lead', pct(dv(a.leads,a.clicks)*100),'');
   cards+=kpiCard(true,'Leads (formulário)',intf(a.leads),
     subRow('CPL', money(cpl), trendHTML(cpl, dv(p.spend,p.leads), false))
     + subRow('Clique → Lead', pct(dv(a.leads,a.clicks)*100), trendHTML(dv(a.leads,a.clicks), dv(p.leads,p.clicks), true))
-    + subRow('Origem', '<small><b class="chip-pago">'+intf(a.leadsPaid)+' pago</b> · <b class="chip-org">'+intf(org)+' orgânico</b></small>',''));
+    + originSub);
   el('kpiCol').innerHTML = hero + cards;
 }
 
@@ -106,12 +124,12 @@ function bindHits(containerId,days,fmt){ var c=el(containerId); if(!c) return;
   Array.prototype.forEach.call(c.querySelectorAll('.hit'),function(r){
     r.addEventListener('mousemove',function(e){ var i=+r.getAttribute('data-i'); if(days[i]) tipShow(fmt(days[i]),e.clientX,e.clientY); });
     r.addEventListener('mouseleave',tipHide); }); }
-function tipLeads(d){ var org=d.leads-d.leadsPaid;
-  return '<div class="tt-d">'+fmtBR(d.date)+'</div>'
-    +'<div class="tt-r"><span style="color:'+COL.cy2+'">Leads (total)</span><b>'+intf(d.leads)+'</b></div>'
-    +'<div class="tt-r"><span style="color:'+COL.cy+'">Pago</span><b>'+intf(d.leadsPaid)+'</b></div>'
-    +'<div class="tt-r"><span style="color:'+COL.vi2+'">Orgânico</span><b>'+intf(org)+'</b></div>'
-    +'<div class="tt-sub">CPL '+(d.leads?money(dv(d.spend,d.leads)):'—')+'</div>'; }
+function tipLeads(d){
+  var s='<div class="tt-d">'+fmtBR(d.date)+'</div>'
+    +'<div class="tt-r"><span style="color:'+COL.cy2+'">Leads</span><b>'+intf(d.leads)+'</b></div>';
+  if(channel==='geral'){ s+='<div class="tt-r"><span style="color:'+COL.cy+'">Meta</span><b>'+intf(d.mLeads)+'</b></div>'
+    +'<div class="tt-r"><span style="color:'+COL.vi2+'">Google</span><b>'+intf(d.gLeads)+'</b></div>'; }
+  return s+'<div class="tt-sub">Investimento '+money0(d.spend)+' · CPL '+(d.leads?money(dv(d.spend,d.leads)):'—')+'</div>'; }
 function tipInvest(d){
   return '<div class="tt-d">'+fmtBR(d.date)+'</div>'
     +'<div class="tt-r"><span style="color:'+COL.cy2+'">Investimento</span><b>'+money0(d.spend)+'</b></div>'
@@ -124,15 +142,19 @@ function renderChartLeads(days){
   var n=days.length||1,gw=pw/n,bw=Math.max(3,Math.min(20,gw*0.5));
   var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
   [0,0.5,1].forEach(function(f){ var y=pt+ph*(1-f); s+='<line x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'" stroke="#182034" stroke-dasharray="2 3"/>'; s+='<text x="'+(pl-4)+'" y="'+(y+3)+'" text-anchor="end" fill="#586a8c" font-size="9">'+Math.round(maxL*f)+'</text>'; });
+  var single = channel!=='geral', sColor = channel==='google'?COL.vi:COL.cy;
   days.forEach(function(d,i){
-    var xc=pl+gw*i+gw/2, org=d.leads-d.leadsPaid;
-    var ph_paid=ph*dv(d.leadsPaid,maxL), ph_org=ph*dv(org,maxL);
-    if(d.leadsPaid>0) s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-ph_paid).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+ph_paid.toFixed(1)+'" rx="1.5" fill="'+COL.cy+'"/>';
-    if(org>0) s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-ph_paid-ph_org).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+ph_org.toFixed(1)+'" rx="1.5" fill="'+COL.vi+'"/>';
+    var xc=pl+gw*i+gw/2;
+    if(single){ var h=ph*dv(d.leads,maxL); if(d.leads>0) s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-h).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="1.5" fill="'+sColor+'"/>'; }
+    else { var hm=ph*dv(d.mLeads,maxL), hg=ph*dv(d.gLeads,maxL);
+      if(d.mLeads>0) s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-hm).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+hm.toFixed(1)+'" rx="1.5" fill="'+COL.cy+'"/>';
+      if(d.gLeads>0) s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-hm-hg).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+hg.toFixed(1)+'" rx="1.5" fill="'+COL.vi+'"/>'; }
   });
   xticks(days).forEach(function(i){ var xc=pl+gw*i+gw/2; s+='<text x="'+xc.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" fill="#586a8c" font-size="9">'+fmtBR(days[i].date)+'</text>'; });
   s+=hitRects(days,pl,gw,pt,ph)+'</svg>';
-  el('chartLeads').innerHTML='<div class="chart">'+s+'</div><div class="chart-legend"><span><span class="dot" style="background:'+COL.cy+'"></span>Pago</span><span><span class="dot" style="background:'+COL.vi+'"></span>Orgânico</span></div>';
+  var legend = single ? '<span><span class="dot" style="background:'+sColor+'"></span>Leads</span>'
+    : '<span><span class="dot" style="background:'+COL.cy+'"></span>Meta</span><span><span class="dot" style="background:'+COL.vi+'"></span>Google</span>';
+  el('chartLeads').innerHTML='<div class="chart">'+s+'</div><div class="chart-legend">'+legend+'</div>';
   bindHits('chartLeads',days,tipLeads);
 }
 function renderChartInvest(days){
@@ -164,20 +186,19 @@ function renderDaily(rng){
   var maxL=Math.max.apply(null,rows.map(function(r){return r.leads||0;}).concat([1]));
   var medCpl=median(rows.map(function(r){return r.leads>0?dv(r.spend,r.leads):null;}));
   var medCpm=median(rows.map(function(r){return r.impr>0?dv(r.spend,r.impr)*1000:null;}));
-  var head='<thead><tr><th>Dia</th><th>Gasto</th><th>Leads</th><th>Pago</th><th>Orgânico</th><th>CPL</th><th>CPM</th><th>CTR</th><th>Connect</th></tr></thead>';
+  var head='<thead><tr><th>Dia</th><th>Gasto</th><th>Impressões</th><th>Cliques</th><th>Leads</th><th>CPL</th><th>CPM</th><th>CTR</th></tr></thead>';
   var body=rows.map(function(r){
-    var org=r.leads-r.leadsPaid, cpl=r.leads>0?dv(r.spend,r.leads):null, cpm=dv(r.spend,r.impr)*1000, ctr=dv(r.clicks,r.impr)*100, conn=dv(r.lpv,r.clicks)*100;
+    var cpl=r.leads>0?dv(r.spend,r.leads):null, cpm=dv(r.spend,r.impr)*1000, ctr=dv(r.clicks,r.impr)*100;
     return '<tr><td>'+fmtBR(r.date)+'</td>'
       +'<td class="num"><span class="heatcell" style="'+heatBg('34,211,238',r.spend/maxS)+'">'+money0(r.spend)+'</span></td>'
+      +'<td class="num">'+intf(r.impr)+'</td>'
+      +'<td class="num">'+intf(r.clicks)+'</td>'
       +'<td class="num"><span class="heatcell" style="'+heatBg('103,232,249',r.leads/maxL)+'">'+intf(r.leads)+'</span></td>'
-      +'<td class="num chip-pago">'+intf(r.leadsPaid)+'</td>'
-      +'<td class="num chip-org">'+(org||'·')+'</td>'
       +'<td class="num">'+(cpl!=null?'<span class="cpl-pill '+relClass(cpl,medCpl)+'">'+money0(cpl)+'</span>':'—')+'</td>'
       +'<td class="num"><span class="cpl-pill '+relClass(cpm,medCpm)+'">'+money(cpm)+'</span></td>'
-      +'<td class="num">'+pct(ctr)+'</td>'
-      +'<td class="num">'+(r.clicks?pct(conn):'—')+'</td></tr>';
+      +'<td class="num">'+pct(ctr)+'</td></tr>';
   }).join('');
-  if(!rows.length) body='<tr><td colspan="9" class="empty">Sem dados no período.</td></tr>';
+  if(!rows.length) body='<tr><td colspan="8" class="empty">Sem dados no período.</td></tr>';
   el('dailyTbl').innerHTML=head+'<tbody>'+body+'</tbody>';
 }
 
@@ -214,12 +235,12 @@ function treeRow(n,lvl,key,hasKids,med){
 }
 function sortKids(obj){ return Object.keys(obj).sort(function(x,y){ return (obj[y].leads)-(obj[x].leads) || obj[y].spend-obj[x].spend; }); }
 function renderTree(rng){
-  var rows=grain.filter(function(r){return inRange(r.date,rng);});
+  var rows=grain.filter(function(r){return inRange(r.date,rng)&&chMatch(r);});
   var camps=buildTree(rows), order=sortKids(camps);
   var leafCpls=[]; order.forEach(function(cK){ if(cK==='SEM_RASTREIO')return; var c=camps[cK]; Object.keys(c.kids).forEach(function(sK){ var sN=c.kids[sK]; Object.keys(sN.kids).forEach(function(aK){ var an=sN.kids[aK]; if(an.spend>0&&an.leads>0) leafCpls.push(dv(an.spend,an.leads)); }); }); });
   var med=median(leafCpls);
   if(!treeInited){ order.forEach(function(cK){ expanded['c:'+cK]=true; }); treeInited=true; }
-  var head='<thead><tr><th>Campanha › Conjunto › Anúncio</th><th>Gasto</th><th>Leads</th><th>CPL</th><th>CTR</th><th>Connect</th><th>Ação</th></tr></thead>';
+  var head='<thead><tr><th>Campanha › Conjunto/Grupo › Anúncio</th><th>Gasto</th><th>Leads</th><th>CPL</th><th>CTR</th><th>Connect</th><th>Ação</th></tr></thead>';
   var out=[];
   order.forEach(function(cK){ var c=camps[cK],cKey='c:'+cK,cHas=Object.keys(c.kids).length>0; out.push(treeRow(c,0,cKey,cHas,med));
     if(expanded[cKey]){ sortKids(c.kids).forEach(function(sK){ var sN=c.kids[sK],sKey=cKey+'|s:'+sK,sHas=Object.keys(sN.kids).length>0; out.push(treeRow(sN,1,sKey,sHas,med));
@@ -379,6 +400,16 @@ function initPeriods(){
   de.addEventListener('change',onDate); ate.addEventListener('change',onDate);
   syncPeriodUI();
 }
+var CHANNELS=[{k:'geral',label:'Geral',dot:''},{k:'meta',label:'Meta Ads',dot:COL.cy},{k:'google',label:'Google Ads',dot:COL.vi}];
+function syncChannelUI(){ Array.prototype.forEach.call(el('chbar').querySelectorAll('.chbtn'),function(b){ b.classList.toggle('on', channel===b.getAttribute('data-ch')); }); }
+function initChannels(){
+  var qp=(location.search.match(/[?&]channel=(geral|meta|google)/)||[])[1]; if(qp) channel=qp;
+  el('chbar').innerHTML='<span class="chlab">Canal</span>'+CHANNELS.map(function(c){
+    return '<button data-ch="'+c.k+'" class="chbtn '+c.k+'">'+(c.dot?'<span class="cdot" style="background:'+c.dot+'"></span>':'')+c.label+'</button>'; }).join('');
+  Array.prototype.forEach.call(el('chbar').querySelectorAll('.chbtn'),function(b){
+    b.addEventListener('click',function(){ channel=b.getAttribute('data-ch'); treeInited=false; syncChannelUI(); renderAll(); }); });
+  syncChannelUI();
+}
 function renderAll(){ var rng=rangeFor(period), a=aggDaily(rng), p=aggDaily(prevRange(rng)), days=daysInRange(rng);
   renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderDaily(rng); renderTree(rng); }
 var TABS=['funil','leads','engaje'];
@@ -392,10 +423,12 @@ function initCoverage(){ el('updated').textContent=D.generatedAtBR||'—'; el('t
   if((D.leadDateMin||'')!==(minDate||'') || (D.leadDateMax||'')!==(maxDate||'')){
     msg='Leads registrados: <b>'+fmtBR(D.leadDateMin||'')+' → '+fmtBR(D.leadDateMax||'')+'</b> · Tráfego/gasto: <b>'+fmtBR(minDate)+' → '+fmtBR(maxDate)+'</b>. Em dias sem lead o CPL fica "—".';
   } else {
-    msg='Funil <b>SIP-S1</b> · dados de <b>'+fmtBR(minDate)+' → '+fmtBR(maxDate)+'</b> · <b>'+intf(totals.leads||0)+'</b> leads captados ('+intf(totals.paid||0)+' pago · '+intf(totals.organic||0)+' orgânico).';
+    var bc=arr(D.byChannel), m=null,g=null; bc.forEach(function(x){ if(x.ch==='meta')m=x; if(x.ch==='google')g=x; });
+    var chTxt = (m&&g) ? ' · <b class="chip-pago">Meta '+money0(m.spend)+'</b> + <b class="chip-org">Google '+money0(g.spend)+'</b> (Google s/ imposto)' : '';
+    msg='Funil <b>SIP-S1</b> · <b>'+fmtBR(minDate)+' → '+fmtBR(maxDate)+'</b> · <b>'+intf(totals.leads||0)+'</b> leads ('+intf(totals.paid||0)+' pago · '+intf(totals.organic||0)+' org)'+chTxt+'.';
   }
   el('coverage').innerHTML=msg; }
 
 if(!daily.length && !grain.length){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
-else { initCoverage(); initPeriods(); initTabs(); renderAll(); mountLeads(); mountEngage(); }
+else { initCoverage(); initPeriods(); initChannels(); initTabs(); renderAll(); mountLeads(); mountEngage(); }
 })();
