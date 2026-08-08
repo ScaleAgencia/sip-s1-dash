@@ -221,6 +221,19 @@ function prettyName(x){ return x==='SEM_RASTREIO' ? '— sem rastreio (orgânico
 function newNode(name,full){ return {name:name,full:full,spend:0,impr:0,reach:0,clicks:0,lpv:0,leads:0,kids:{}}; }
 function accum(n,r){ n.spend+=r.spend||0;n.impr+=r.impr||0;n.reach+=r.reach||0;n.clicks+=r.clicks||0;n.lpv+=r.lpv||0;n.leads+=r.leads||0; }
 var expanded={}, treeInited=false;
+/* ordenação da árvore de otimização (clique no cabeçalho) · dir -1=maior→menor, 1=menor→maior */
+var treeSort={key:'leads',dir:-1};
+var TREECOLS=[{k:'name',lab:'Campanha › Conjunto/Grupo › Anúncio',cls:''},{k:'spend',lab:'Gasto',cls:'num'},{k:'leads',lab:'Leads',cls:'num'},{k:'cpl',lab:'CPL',cls:'num'},{k:'ctr',lab:'CTR',cls:'num'},{k:'connect',lab:'Connect',cls:'num'},{k:null,lab:'Ação',cls:'num'}];
+function treeMetric(n,key){ switch(key){
+  case 'spend': return n.spend||0; case 'leads': return n.leads||0;
+  case 'cpl': return n.leads>0 ? n.spend/n.leads : Infinity;   // sem lead = "infinitamente caro" (pior)
+  case 'ctr': return dv(n.clicks,n.impr); case 'connect': return dv(n.lpv,n.clicks);
+  default: return 0; } }
+function treeDefaultDir(key){ return (key==='cpl'||key==='name') ? 1 : -1; } // melhor primeiro: CPL/nome sobem, resto desce
+function sortLabel(){ var c=null; for(var i=0;i<TREECOLS.length;i++){ if(TREECOLS[i].k===treeSort.key) c=TREECOLS[i]; }
+  if(!c) return 'ordenado por leads';
+  var better = treeSort.dir===treeDefaultDir(treeSort.key);
+  return 'ordenado por '+(c.k==='name'?'nome':c.lab)+' · '+(treeSort.dir===-1?'maior→menor':'menor→maior')+(better?' (melhor→pior)':' (pior→melhor)'); }
 function buildTree(rows){ var c={}; rows.forEach(function(r){
   var cn=c[r.campaign]||(c[r.campaign]=newNode(prettyName(r.campaign),r.campaign)); accum(cn,r);
   var sn=cn.kids[r.adset]||(cn.kids[r.adset]=newNode(prettyName(r.adset),r.adset)); accum(sn,r);
@@ -247,14 +260,25 @@ function treeRow(n,lvl,key,hasKids,med){
   return '<tr class="lvl'+lvl+(hasKids?' parent':'')+'" data-key="'+encodeURIComponent(key)+'">'
     +'<td><span class="name" title="'+esc(n.full||n.name)+'">'+caret+' '+esc(n.name)+'</span></td>'+metricsCells(n,med)+'</tr>';
 }
-function sortKids(obj){ return Object.keys(obj).sort(function(x,y){ return (obj[y].leads)-(obj[x].leads) || obj[y].spend-obj[x].spend; }); }
+function cmpNodes(a,b){
+  if(treeSort.key==='name'){ return treeSort.dir * String(a.name).localeCompare(String(b.name),'pt',{numeric:true}); }
+  var va=treeMetric(a,treeSort.key), vb=treeMetric(b,treeSort.key);
+  if(va===vb || (!isFinite(va)&&!isFinite(vb))) return (b.leads-a.leads) || (b.spend-a.spend); // desempate estável
+  if(!isFinite(va)) return 1; if(!isFinite(vb)) return -1;   // "—" (sem lead) sempre no fim
+  return treeSort.dir*(va-vb);
+}
+function sortKids(obj){ return Object.keys(obj).sort(function(x,y){ return cmpNodes(obj[x],obj[y]); }); }
 function renderTree(rng){
   var rows=grain.filter(function(r){return inRange(r.date,rng)&&chMatch(r);});
   var camps=buildTree(rows), order=sortKids(camps);
   var leafCpls=[]; order.forEach(function(cK){ if(cK==='SEM_RASTREIO')return; var c=camps[cK]; Object.keys(c.kids).forEach(function(sK){ var sN=c.kids[sK]; Object.keys(sN.kids).forEach(function(aK){ var an=sN.kids[aK]; if(an.spend>0&&an.leads>0) leafCpls.push(dv(an.spend,an.leads)); }); }); });
   var med=median(leafCpls);
   if(!treeInited){ order.forEach(function(cK){ expanded['c:'+cK]=true; }); treeInited=true; }
-  var head='<thead><tr><th>Campanha › Conjunto/Grupo › Anúncio</th><th>Gasto</th><th>Leads</th><th>CPL</th><th>CTR</th><th>Connect</th><th>Ação</th></tr></thead>';
+  var head='<thead><tr>'+TREECOLS.map(function(c){
+    if(!c.k) return '<th class="'+c.cls+'">'+c.lab+'</th>';
+    var act=treeSort.key===c.k, car=act?('<span class="sort-caret">'+(treeSort.dir===-1?'▼':'▲')+'</span>'):'<span class="sort-caret dim">▾</span>';
+    return '<th class="'+c.cls+' sortable'+(act?' act':'')+'" data-sort="'+c.k+'" title="Clique p/ ordenar">'+c.lab+car+'</th>';
+  }).join('')+'</tr></thead>';
   var out=[];
   order.forEach(function(cK){ var c=camps[cK],cKey='c:'+cK,cHas=Object.keys(c.kids).length>0; out.push(treeRow(c,0,cKey,cHas,med));
     if(expanded[cKey]){ sortKids(c.kids).forEach(function(sK){ var sN=c.kids[sK],sKey=cKey+'|s:'+sK,sHas=Object.keys(sN.kids).length>0; out.push(treeRow(sN,1,sKey,sHas,med));
@@ -264,9 +288,13 @@ function renderTree(rng){
   el('treeLegend').innerHTML='<span><span class="act act-acel">Acelerar</span> CPL baixo</span>'
     +'<span><span class="act act-mant">Manter</span> CPL na média</span>'
     +'<span><span class="act act-rev">Revisar</span> CPL alto</span>'
-    +'<span style="color:var(--muted2)">CPL colorido vs. mediana dos anúncios · ordenado por volume de leads</span>';
+    +'<span style="color:var(--muted2)">CPL colorido vs. mediana dos anúncios · '+sortLabel()+' · clique nos títulos p/ ordenar</span>';
   Array.prototype.forEach.call(el('treeTbl').querySelectorAll('tr.parent'),function(tr){
     tr.addEventListener('click',function(){ var k=decodeURIComponent(tr.getAttribute('data-key')); expanded[k]=!expanded[k]; renderTree(rangeFor(period)); }); });
+  Array.prototype.forEach.call(el('treeTbl').querySelectorAll('th.sortable'),function(th){
+    th.addEventListener('click',function(){ var k=th.getAttribute('data-sort');
+      if(treeSort.key===k){ treeSort.dir=-treeSort.dir; } else { treeSort.key=k; treeSort.dir=treeDefaultDir(k); }
+      renderTree(rangeFor(period)); }); });
 }
 
 /* =================== LEADS · VISÃO GERAL (base completa) =================== */
