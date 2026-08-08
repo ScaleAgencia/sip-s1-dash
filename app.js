@@ -1,8 +1,16 @@
-/* SIP-S1 dashboard — render puro (sem libs, SVG na mão) sobre window.SIPS1 */
+/* SIP dashboard — render puro (sem libs, SVG na mão) sobre window.SIP (2 funis) */
 (function(){
 'use strict';
-var D = window.SIPS1 || {};
 var arr = function(x){ return Array.isArray(x) ? x : (x ? [x] : []); };
+var isDate = function(x){ return /^\d{4}-\d{2}-\d{2}$/.test(x); };
+/* ---- fonte: window.SIP {funnels:[{key,label}], data:{key:payload}} ---- */
+var FUN = window.SIP || null;
+if(!FUN && window.SIPS1){ FUN={generatedAtBR:window.SIPS1.generatedAtBR,defaultFunnel:'s1',funnels:[{key:'s1',label:'SIP-S1'}],data:{s1:window.SIPS1}}; } /* compat */
+FUN = FUN || {data:{},funnels:[]};
+var funnels = arr(FUN.funnels);
+var funKey = FUN.defaultFunnel || (funnels[0]&&funnels[0].key) || 's1';
+var D = (FUN.data&&FUN.data[funKey]) || {};
+function funLabel(k){ for(var i=0;i<funnels.length;i++){ if(funnels[i].key===k) return funnels[i].label; } return String(k||'').toUpperCase(); }
 var clamp = function(x){ return Math.max(0, Math.min(1, x)); };
 var nf0 = new Intl.NumberFormat('pt-BR');
 var nf1 = new Intl.NumberFormat('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1});
@@ -19,10 +27,16 @@ function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 var COL={cy:'#22d3ee',cy2:'#67e8f9',vi:'#8b7cf0',vi2:'#a99bf7',good:'#34d399',warn:'#f5b041',bad:'#f2637e'};
 
 var daily = arr(D.daily), grain = arr(D.grain), totals = D.totals||{};
-var isDate = function(x){ return /^\d{4}-\d{2}-\d{2}$/.test(x); };
 var allDates = daily.map(function(d){return d.date;}).filter(isDate).sort();
 var maxDate = D.dateMax || allDates[allDates.length-1] || '';
 var minDate = D.dateMin || allDates[0] || '';
+function setFunnelVars(){
+  D = (FUN.data&&FUN.data[funKey]) || {};
+  daily = arr(D.daily); grain = arr(D.grain); totals = D.totals||{};
+  allDates = daily.map(function(d){return d.date;}).filter(isDate).sort();
+  maxDate = D.dateMax || allDates[allDates.length-1] || '';
+  minDate = D.dateMin || allDates[0] || '';
+}
 function addDays(iso,n){ var p=iso.split('-'); var dt=new Date(Date.UTC(+p[0],+p[1]-1,+p[2])); dt.setUTCDate(dt.getUTCDate()+n); return dt.toISOString().slice(0,10); }
 function daysBetween(a,b){ var pa=a.split('-'),pb=b.split('-'); return Math.round((Date.UTC(+pb[0],+pb[1]-1,+pb[2])-Date.UTC(+pa[0],+pa[1]-1,+pa[2]))/86400000); }
 function inRange(dt,r){ return dt>=r[0] && dt<=r[1]; }
@@ -418,17 +432,47 @@ function activateTab(id){ Array.prototype.forEach.call(document.querySelectorAll
 function initTabs(){ Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(t){ t.addEventListener('click',function(){ var id=t.getAttribute('data-tab'); activateTab(id); if(history.replaceState)history.replaceState(null,'','#'+id); }); });
   var h=(location.hash||'').replace('#',''); if(TABS.indexOf(h)>=0)activateTab(h);
   window.addEventListener('hashchange',function(){ var k=(location.hash||'').replace('#',''); if(TABS.indexOf(k)>=0)activateTab(k); }); }
-function initCoverage(){ el('updated').textContent=D.generatedAtBR||'—'; el('taxf').textContent=(D.taxMultiplier||1.1385).toFixed(4).replace('.',',');
+function initCoverage(){ el('updated').textContent=D.generatedAtBR||FUN.generatedAtBR||'—'; el('taxf').textContent=(D.taxMultiplier||1.1385).toFixed(4).replace('.',',');
+  var lab=funLabel(funKey);
+  var bc=arr(D.byChannel), m=null,g=null; bc.forEach(function(x){ if(x.ch==='meta')m=x; if(x.ch==='google')g=x; });
+  var chTxt = (m&&g) ? ' · <b class="chip-pago">Meta '+money0(m.spend)+'</b> + <b class="chip-org">Google '+money0(g.spend)+'</b> (Google s/ imposto)' : '';
   var msg='';
-  if((D.leadDateMin||'')!==(minDate||'') || (D.leadDateMax||'')!==(maxDate||'')){
-    msg='Leads registrados: <b>'+fmtBR(D.leadDateMin||'')+' → '+fmtBR(D.leadDateMax||'')+'</b> · Tráfego/gasto: <b>'+fmtBR(minDate)+' → '+fmtBR(maxDate)+'</b>. Em dias sem lead o CPL fica "—".';
+  if(D.leadsOk===false){
+    msg='<span class="cov-warn">⚠ Leads do <b>'+esc(lab)+'</b> ainda não carregados</span> — a planilha de leads está privada. Libere o acesso ("Qualquer pessoa com o link · Leitor") para ver leads, pesquisa e grupos. <b>Tráfego já disponível:</b> <b>'+fmtBR(minDate)+' → '+fmtBR(maxDate)+'</b>'+chTxt+'.';
+  } else if((D.leadDateMin||'')!==(minDate||'') || (D.leadDateMax||'')!==(maxDate||'')){
+    msg='Funil <b>'+esc(lab)+'</b> · Leads registrados: <b>'+fmtBR(D.leadDateMin||'')+' → '+fmtBR(D.leadDateMax||'')+'</b> · Tráfego/gasto: <b>'+fmtBR(minDate)+' → '+fmtBR(maxDate)+'</b>. Em dias sem lead o CPL fica "—".';
   } else {
-    var bc=arr(D.byChannel), m=null,g=null; bc.forEach(function(x){ if(x.ch==='meta')m=x; if(x.ch==='google')g=x; });
-    var chTxt = (m&&g) ? ' · <b class="chip-pago">Meta '+money0(m.spend)+'</b> + <b class="chip-org">Google '+money0(g.spend)+'</b> (Google s/ imposto)' : '';
-    msg='Funil <b>SIP-S1</b> · <b>'+fmtBR(minDate)+' → '+fmtBR(maxDate)+'</b> · <b>'+intf(totals.leads||0)+'</b> leads ('+intf(totals.paid||0)+' pago · '+intf(totals.organic||0)+' org)'+chTxt+'.';
+    msg='Funil <b>'+esc(lab)+'</b> · <b>'+fmtBR(minDate)+' → '+fmtBR(maxDate)+'</b> · <b>'+intf(totals.leads||0)+'</b> leads ('+intf(totals.paid||0)+' pago · '+intf(totals.organic||0)+' org)'+chTxt+'.';
   }
   el('coverage').innerHTML=msg; }
 
-if(!daily.length && !grain.length){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
-else { initCoverage(); initPeriods(); initChannels(); initTabs(); renderAll(); mountLeads(); mountEngage(); }
+/* =================== FUNNEL SWITCH (topo) =================== */
+function updateBranding(){
+  var lab=funLabel(funKey), suf=lab.replace(/^SIP[-\s]?/i,'')||lab;
+  var badge=el('funBadge'); if(badge) badge.textContent=suf;
+  var eb=el('editband'); if(eb) eb.textContent='Funil de Captação · '+lab+' · Meta + Google Ads';
+  try{ document.title='SIP · '+suf+' — Dashboard de Captação'; }catch(e){}
+}
+function syncFunnelUI(){ Array.prototype.forEach.call(el('funnelbar').querySelectorAll('.fbtn'),function(b){ b.classList.toggle('on', funKey===b.getAttribute('data-fn')); }); }
+function switchFunnel(key){
+  if(key===funKey || !(FUN.data&&FUN.data[key])) return;
+  funKey=key; setFunnelVars();
+  period='tudo'; customRange=null; channel='geral'; treeInited=false; expanded={};
+  updateBranding(); syncFunnelUI(); syncChannelUI();
+  initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage();
+  if(history.replaceState){ history.replaceState(null,'', location.pathname+'?funnel='+key+(location.hash||'')); }
+}
+function initFunnels(){
+  var qp=(location.search.match(/[?&]funnel=([a-z0-9]+)/i)||[])[1];
+  if(qp && FUN.data && FUN.data[qp.toLowerCase()]) funKey=qp.toLowerCase();
+  el('funnelbar').innerHTML='<span class="fnlab">Funil</span>'+funnels.map(function(f){
+    return '<button data-fn="'+f.key+'" class="fbtn"><b>'+esc(f.label)+'</b></button>'; }).join('')
+    + '<span class="fnhint">escolha o funil · cada um tem suas próprias fontes</span>';
+  Array.prototype.forEach.call(el('funnelbar').querySelectorAll('.fbtn'),function(b){
+    b.addEventListener('click',function(){ switchFunnel(b.getAttribute('data-fn')); }); });
+  syncFunnelUI();
+}
+
+if(!funnels.length || (!daily.length && !grain.length)){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
+else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); }
 })();
