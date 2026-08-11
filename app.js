@@ -24,7 +24,15 @@ function fmtBR(iso){ if(!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso; var p=iso.
 function el(id){ return document.getElementById(id); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 
-var COL={cy:'#22d3ee',cy2:'#67e8f9',vi:'#8b7cf0',vi2:'#a99bf7',good:'#34d399',warn:'#f5b041',bad:'#f2637e'};
+var COL={cy:'#22d3ee',cy2:'#67e8f9',vi:'#8b7cf0',vi2:'#a99bf7',good:'#34d399',warn:'#f5b041',bad:'#f2637e',gold:'#f0b64d',gold2:'#ffd27a'};
+/* modelo de lead qualificado (perfil comprador) — derivado do cruzamento pesquisa x vendas L17/L18/L19 */
+var QMODEL={ dims:[
+  {q:'Renda mensal',            hi:'≥R$10k = 3 · R$5–10k = 2 · R$2–5k = 1'},
+  {q:'Disponível p/ investir',  hi:'≥R$1k = 3 · R$500–1k = 2 · R$100–500 = 1'},
+  {q:'Já investiu (patrimônio)',hi:'qualquer valor = 2 · “ainda não” = 0'},
+  {q:'Idade',                   hi:'50+ = 2 · 40–49 = 1'},
+  {q:'Já comprou curso',        hi:'sim = 1'}
+]};
 
 var daily = arr(D.daily), grain = arr(D.grain), totals = D.totals||{};
 var allDates = daily.map(function(d){return d.date;}).filter(isDate).sort();
@@ -59,12 +67,12 @@ function prevRange(rng){ var len=daysBetween(rng[0],rng[1])+1; var pe=addDays(rn
 
 var channel='geral';   // geral | meta | google
 function chMatch(d){ return channel==='geral' || d.channel===channel; }
-var CHMETS=['spend','impr','reach','clicks','lpv','platLeads','leads','mLeads','gLeads'];
+var CHMETS=['spend','impr','reach','clicks','lpv','platLeads','leads','qual','mLeads','gLeads'];
 function daysInRange(rng){
   var map={};
   daily.forEach(function(d){ if(!isDate(d.date)||!inRange(d.date,rng)||!chMatch(d)) return;
     var o=map[d.date]; if(!o){ o={date:d.date}; CHMETS.forEach(function(k){o[k]=0;}); map[d.date]=o; }
-    o.spend+=d.spend||0;o.impr+=d.impr||0;o.reach+=d.reach||0;o.clicks+=d.clicks||0;o.lpv+=d.lpv||0;o.platLeads+=d.platLeads||0;o.leads+=d.leads||0;
+    o.spend+=d.spend||0;o.impr+=d.impr||0;o.reach+=d.reach||0;o.clicks+=d.clicks||0;o.lpv+=d.lpv||0;o.platLeads+=d.platLeads||0;o.leads+=d.leads||0;o.qual+=d.qual||0;
     if(d.channel==='meta')o.mLeads+=d.leads||0; else if(d.channel==='google')o.gLeads+=d.leads||0;
   });
   return Object.keys(map).sort().map(function(k){return map[k];});
@@ -123,6 +131,13 @@ function renderKpiCol(a, p){
     subRow('CPL', money(cpl), trendHTML(cpl, dv(p.spend,p.leads), false))
     + subRow('Clique → Lead', pct(dv(a.leads,a.clicks)*100), trendHTML(dv(a.leads,a.clicks), dv(p.leads,p.clicks), true))
     + originSub);
+  // ---- Lead qualificado (perfil comprador) ----
+  var cpq=dv(a.spend,a.qual), cpqP=dv(p.spend,p.qual);
+  cards+='<div class="kpi-card qualcard"><div class="kpi-main"><div class="m-lab">Leads qualificados <span class="qtag">perfil comprador</span></div><div class="m-val">'+intf(a.qual)+'</div></div>'
+    +'<div class="kpi-sub">'
+    + subRow('<b>Custo por lead qualif.</b>', a.qual?money(cpq):'—', trendHTML(cpq, cpqP, false))
+    + subRow('Qualif. / leads', a.leads?pct(dv(a.qual,a.leads)*100):'—', trendHTML(dv(a.qual,a.leads), dv(p.qual,p.leads), true))
+    + '</div></div>';
   el('kpiCol').innerHTML = hero + cards;
 }
 
@@ -218,18 +233,19 @@ function renderDaily(rng){
 
 /* =================== OTIMIZAÇÃO (árvore inline) =================== */
 function prettyName(x){ return x==='SEM_RASTREIO' ? '— sem rastreio (orgânico) —' : x; }
-function newNode(name,full){ return {name:name,full:full,spend:0,impr:0,reach:0,clicks:0,lpv:0,leads:0,kids:{}}; }
-function accum(n,r){ n.spend+=r.spend||0;n.impr+=r.impr||0;n.reach+=r.reach||0;n.clicks+=r.clicks||0;n.lpv+=r.lpv||0;n.leads+=r.leads||0; }
+function newNode(name,full){ return {name:name,full:full,spend:0,impr:0,reach:0,clicks:0,lpv:0,leads:0,qual:0,kids:{}}; }
+function accum(n,r){ n.spend+=r.spend||0;n.impr+=r.impr||0;n.reach+=r.reach||0;n.clicks+=r.clicks||0;n.lpv+=r.lpv||0;n.leads+=r.leads||0;n.qual+=r.qual||0; }
 var expanded={}, treeInited=false;
 /* ordenação da árvore de otimização (clique no cabeçalho) · dir -1=maior→menor, 1=menor→maior */
 var treeSort={key:'leads',dir:-1};
-var TREECOLS=[{k:'name',lab:'Campanha › Conjunto/Grupo › Anúncio',cls:''},{k:'spend',lab:'Gasto',cls:'num'},{k:'leads',lab:'Leads',cls:'num'},{k:'cpl',lab:'CPL',cls:'num'},{k:'ctr',lab:'CTR',cls:'num'},{k:'connect',lab:'Connect',cls:'num'},{k:null,lab:'Ação',cls:'num'}];
+var TREECOLS=[{k:'name',lab:'Campanha › Conjunto/Grupo › Anúncio',cls:''},{k:'spend',lab:'Gasto',cls:'num'},{k:'leads',lab:'Leads',cls:'num'},{k:'cpl',lab:'CPL',cls:'num'},{k:'qual',lab:'Qualif.',cls:'num'},{k:'cplq',lab:'CPL Qualif.',cls:'num'},{k:'ctr',lab:'CTR',cls:'num'},{k:'connect',lab:'Connect',cls:'num'},{k:null,lab:'Ação',cls:'num'}];
 function treeMetric(n,key){ switch(key){
-  case 'spend': return n.spend||0; case 'leads': return n.leads||0;
+  case 'spend': return n.spend||0; case 'leads': return n.leads||0; case 'qual': return n.qual||0;
   case 'cpl': return n.leads>0 ? n.spend/n.leads : Infinity;   // sem lead = "infinitamente caro" (pior)
+  case 'cplq': return n.qual>0 ? n.spend/n.qual : Infinity;    // sem lead qualificado = pior
   case 'ctr': return dv(n.clicks,n.impr); case 'connect': return dv(n.lpv,n.clicks);
   default: return 0; } }
-function treeDefaultDir(key){ return (key==='cpl'||key==='name') ? 1 : -1; } // melhor primeiro: CPL/nome sobem, resto desce
+function treeDefaultDir(key){ return (key==='cpl'||key==='cplq'||key==='name') ? 1 : -1; } // melhor primeiro: CPL/CPLQ/nome sobem, resto desce
 function sortLabel(){ var c=null; for(var i=0;i<TREECOLS.length;i++){ if(TREECOLS[i].k===treeSort.key) c=TREECOLS[i]; }
   if(!c) return 'ordenado por leads';
   var better = treeSort.dir===treeDefaultDir(treeSort.key);
@@ -248,17 +264,19 @@ function actTag(n,med){
   if(r>=1.35) return {t:'Revisar',c:'act-rev'};
   return {t:'Manter',c:'act-mant'};
 }
-function metricsCells(n,med){ var cpl=n.leads>0?dv(n.spend,n.leads):null, ctr=dv(n.clicks,n.impr)*100, conn=dv(n.lpv,n.clicks)*100, tag=actTag(n,med);
+function metricsCells(n,med,medQ){ var cpl=n.leads>0?dv(n.spend,n.leads):null, cplq=n.qual>0?dv(n.spend,n.qual):null, ctr=dv(n.clicks,n.impr)*100, conn=dv(n.lpv,n.clicks)*100, tag=actTag(n,med);
   return '<td class="num">'+money0(n.spend)+'</td>'
     +'<td class="num">'+intf(n.leads)+'</td>'
     +'<td class="num">'+(cpl!=null?'<span class="cpl-pill '+relClass(cpl,med)+'">'+money0(cpl)+'</span>':'—')+'</td>'
+    +'<td class="num">'+(n.qual?'<b class="qnum">'+intf(n.qual)+'</b>':'<span class="muted3">0</span>')+'</td>'
+    +'<td class="num">'+(cplq!=null?'<span class="cpl-pill '+relClass(cplq,medQ)+'">'+money0(cplq)+'</span>':'—')+'</td>'
     +'<td class="num">'+(n.impr?pct(ctr):'—')+'</td>'
     +'<td class="num">'+(n.clicks?pct(conn):'—')+'</td>'
     +'<td class="num"><span class="act '+tag.c+'">'+tag.t+'</span></td>'; }
-function treeRow(n,lvl,key,hasKids,med){
+function treeRow(n,lvl,key,hasKids,med,medQ){
   var caret=hasKids?'<span class="caret'+(expanded[key]?' open':'')+'">▶</span>':'<span class="caret" style="opacity:.2">•</span>';
   return '<tr class="lvl'+lvl+(hasKids?' parent':'')+'" data-key="'+encodeURIComponent(key)+'">'
-    +'<td><span class="name" title="'+esc(n.full||n.name)+'">'+caret+' '+esc(n.name)+'</span></td>'+metricsCells(n,med)+'</tr>';
+    +'<td><span class="name" title="'+esc(n.full||n.name)+'">'+caret+' '+esc(n.name)+'</span></td>'+metricsCells(n,med,medQ)+'</tr>';
 }
 function cmpNodes(a,b){
   if(treeSort.key==='name'){ return treeSort.dir * String(a.name).localeCompare(String(b.name),'pt',{numeric:true}); }
@@ -271,8 +289,8 @@ function sortKids(obj){ return Object.keys(obj).sort(function(x,y){ return cmpNo
 function renderTree(rng){
   var rows=grain.filter(function(r){return inRange(r.date,rng)&&chMatch(r);});
   var camps=buildTree(rows), order=sortKids(camps);
-  var leafCpls=[]; order.forEach(function(cK){ if(cK==='SEM_RASTREIO')return; var c=camps[cK]; Object.keys(c.kids).forEach(function(sK){ var sN=c.kids[sK]; Object.keys(sN.kids).forEach(function(aK){ var an=sN.kids[aK]; if(an.spend>0&&an.leads>0) leafCpls.push(dv(an.spend,an.leads)); }); }); });
-  var med=median(leafCpls);
+  var leafCpls=[], leafCplq=[]; order.forEach(function(cK){ if(cK==='SEM_RASTREIO')return; var c=camps[cK]; Object.keys(c.kids).forEach(function(sK){ var sN=c.kids[sK]; Object.keys(sN.kids).forEach(function(aK){ var an=sN.kids[aK]; if(an.spend>0&&an.leads>0) leafCpls.push(dv(an.spend,an.leads)); if(an.spend>0&&an.qual>0) leafCplq.push(dv(an.spend,an.qual)); }); }); });
+  var med=median(leafCpls), medQ=median(leafCplq);
   if(!treeInited){ order.forEach(function(cK){ expanded['c:'+cK]=true; }); treeInited=true; }
   var head='<thead><tr>'+TREECOLS.map(function(c){
     if(!c.k) return '<th class="'+c.cls+'">'+c.lab+'</th>';
@@ -280,15 +298,15 @@ function renderTree(rng){
     return '<th class="'+c.cls+' sortable'+(act?' act':'')+'" data-sort="'+c.k+'" title="Clique p/ ordenar">'+c.lab+car+'</th>';
   }).join('')+'</tr></thead>';
   var out=[];
-  order.forEach(function(cK){ var c=camps[cK],cKey='c:'+cK,cHas=Object.keys(c.kids).length>0; out.push(treeRow(c,0,cKey,cHas,med));
-    if(expanded[cKey]){ sortKids(c.kids).forEach(function(sK){ var sN=c.kids[sK],sKey=cKey+'|s:'+sK,sHas=Object.keys(sN.kids).length>0; out.push(treeRow(sN,1,sKey,sHas,med));
-      if(expanded[sKey]){ sortKids(sN.kids).forEach(function(aK){ out.push(treeRow(sN.kids[aK],2,sKey+'|a:'+aK,false,med)); }); } }); } });
-  if(!out.length) out.push('<tr><td colspan="7" class="empty">Sem dados no período.</td></tr>');
+  order.forEach(function(cK){ var c=camps[cK],cKey='c:'+cK,cHas=Object.keys(c.kids).length>0; out.push(treeRow(c,0,cKey,cHas,med,medQ));
+    if(expanded[cKey]){ sortKids(c.kids).forEach(function(sK){ var sN=c.kids[sK],sKey=cKey+'|s:'+sK,sHas=Object.keys(sN.kids).length>0; out.push(treeRow(sN,1,sKey,sHas,med,medQ));
+      if(expanded[sKey]){ sortKids(sN.kids).forEach(function(aK){ out.push(treeRow(sN.kids[aK],2,sKey+'|a:'+aK,false,med,medQ)); }); } }); } });
+  if(!out.length) out.push('<tr><td colspan="'+TREECOLS.length+'" class="empty">Sem dados no período.</td></tr>');
   el('treeTbl').innerHTML=head+'<tbody>'+out.join('')+'</tbody>';
   el('treeLegend').innerHTML='<span><span class="act act-acel">Acelerar</span> CPL baixo</span>'
     +'<span><span class="act act-mant">Manter</span> CPL na média</span>'
     +'<span><span class="act act-rev">Revisar</span> CPL alto</span>'
-    +'<span style="color:var(--muted2)">CPL colorido vs. mediana dos anúncios · '+sortLabel()+' · clique nos títulos p/ ordenar</span>';
+    +'<span style="color:var(--muted2)"><b class="qnum">Qualif.</b> = leads perfil comprador · <b>CPL Qualif.</b> = custo/lead qualificado · '+sortLabel()+' · clique nos títulos p/ ordenar</span>';
   Array.prototype.forEach.call(el('treeTbl').querySelectorAll('tr.parent'),function(tr){
     tr.addEventListener('click',function(){ var k=decodeURIComponent(tr.getAttribute('data-key')); expanded[k]=!expanded[k]; renderTree(rangeFor(period)); }); });
   Array.prototype.forEach.call(el('treeTbl').querySelectorAll('th.sortable'),function(th){
@@ -416,6 +434,45 @@ function mountEngage(){
   renderEngTable(rows);
 }
 
+/* =================== QUALIFICAÇÃO (perfil comprador) =================== */
+function renderQualHist(hist,min){
+  var W=600,H=182,pl=28,pr=12,pt=16,pb=26,pw=W-pl-pr,ph=H-pt-pb,base=pt+ph;
+  var n=hist.length||1, maxV=Math.max.apply(null,hist.concat([1])), gw=pw/n, bw=Math.min(34,gw*0.72);
+  var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
+  [0,0.5,1].forEach(function(f){ var y=pt+ph*(1-f); s+='<line x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'" stroke="#182034" stroke-dasharray="2 3"/>'; s+='<text x="'+(pl-4)+'" y="'+(y+3)+'" text-anchor="end" fill="#586a8c" font-size="9">'+Math.round(maxV*f)+'</text>'; });
+  var xMin=pl+gw*min; s+='<rect x="'+xMin.toFixed(1)+'" y="'+pt+'" width="'+(pl+pw-xMin).toFixed(1)+'" height="'+ph+'" fill="'+COL.gold+'" fill-opacity="0.07"/>';
+  s+='<line x1="'+xMin.toFixed(1)+'" y1="'+pt+'" x2="'+xMin.toFixed(1)+'" y2="'+base+'" stroke="'+COL.gold+'" stroke-dasharray="3 3" stroke-opacity="0.7"/>';
+  s+='<text x="'+(xMin+4).toFixed(1)+'" y="'+(pt+9)+'" fill="'+COL.gold2+'" font-size="9">qualificado ≥'+min+'</text>';
+  hist.forEach(function(v,i){ var xc=pl+gw*i+gw/2, h=ph*dv(v,maxV), q=i>=min;
+    s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-h).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="2" fill="'+(q?COL.gold:'#33415f')+'"/>';
+    s+='<text x="'+xc.toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" fill="#586a8c" font-size="9">'+i+'</text>';
+    if(v>0) s+='<text x="'+xc.toFixed(1)+'" y="'+(base-h-3).toFixed(1)+'" text-anchor="middle" fill="'+(q?COL.gold2:'#7b8bad')+'" font-size="8.5">'+intf(v)+'</text>'; });
+  s+='</svg>';
+  el('qualHist').innerHTML='<div class="chart">'+s+'</div><div class="chart-legend"><span>eixo X = score do lead (0–11) · Y = nº de leads que responderam · <b style="color:'+COL.gold2+'">dourado</b> = qualificado</span></div>';
+}
+function mountQual(){
+  var Q=D.qual||{}, ref=Q.ref||{}, hist=arr(Q.hist).map(function(x){return +x||0;}), min=Q.min||6;
+  var qual=Q.leads||0, resp=Q.responded||0, totL=Q.totalLeads||0;
+  var bc=arr(D.byChannel), m=null,g=null; bc.forEach(function(x){ if(x.ch==='meta')m=x; if(x.ch==='google')g=x; });
+  var rateResp=dv(qual,resp), rateTotal=dv(qual,totL);
+  el('qualStats').innerHTML='<div class="stat-row" style="grid-template-columns:repeat(3,1fr)">'
+    +'<div class="stat qgold"><div class="s-v">'+intf(qual)+'</div><div class="s-l">Leads qualificados</div></div>'
+    +'<div class="stat"><div class="s-v">'+pct(rateResp*100)+'</div><div class="s-l">Taxa de qualificação <small>(dos que responderam)</small></div></div>'
+    +'<div class="stat"><div class="s-v">'+(qual?money0(dv(totals.spend,qual)):'—')+'</div><div class="s-l">Custo médio / lead qualif.</div></div></div>';
+  var hero=el('qualHero'); hero.className='rate-hero qgold';
+  hero.innerHTML='<span class="rh-val">'+pct(rateResp*100)+'</span>'
+    +'<span class="rh-det"><b>'+intf(qual)+'</b> leads qualificados de <b>'+intf(resp)+'</b> que responderam a pesquisa'
+    +'<br><b>'+pct(rateTotal*100)+'</b> de todos os '+intf(totL)+' leads · perfil de comprador provável</span>';
+  renderQualHist(hist,min);
+  var dims=QMODEL.dims.map(function(d){ return '<div class="qdim"><span class="qd-q">'+d.q+'</span><span class="qd-h">'+d.hi+'</span></div>'; }).join('');
+  el('qualProfile').innerHTML=dims
+    +'<div class="qnote">Qualificado = soma dos pontos <b>≥ '+min+'</b> (de 11). Perfil derivado do cruzamento <b>pesquisa × vendas</b> de <b>'+esc(ref.launches||'L17–L19')+'</b> ('+intf(ref.respondents||0)+' respostas · '+intf(ref.buyers||0)+' compradores): quem entra qualificado compra <b class="qnum">'+nf1.format(ref.lift||2.3)+'×</b> mais que a média ('+nf2.format(ref.qualRate||0)+'% vs '+nf2.format(ref.baseRate||0)+'%) e concentra ~'+Math.round(ref.captured||47)+'% de todos os compradores.</div>';
+  if(m&&g){ el('qualByCh').innerHTML=
+     '<div class="qch"><div class="qch-h"><span class="cdot" style="background:'+COL.cy+'"></span>Meta Ads</div><div class="qch-v">'+intf(m.qual)+' <small>qualif.</small></div><div class="qch-s">'+(m.qual?money0(dv(m.spend,m.qual)):'—')+' / qualif. · '+pct(dv(m.qual,m.leads)*100)+' dos leads</div></div>'
+    +'<div class="qch"><div class="qch-h"><span class="cdot" style="background:'+COL.vi+'"></span>Google Ads</div><div class="qch-v">'+intf(g.qual)+' <small>qualif.</small></div><div class="qch-s">'+(g.qual?money0(dv(g.spend,g.qual)):'—')+' / qualif. · '+pct(dv(g.qual,g.leads)*100)+' dos leads</div></div>'; }
+  else { el('qualByCh').innerHTML=''; }
+}
+
 /* =================== CHROME =================== */
 function periodsHTML(){
   return PRESETS.map(function(p){return '<button data-k="'+p.k+'" class="pbtn">'+p.label+'</button>';}).join('')
@@ -487,7 +544,7 @@ function switchFunnel(key){
   funKey=key; setFunnelVars();
   period='tudo'; customRange=null; channel='geral'; treeInited=false; expanded={};
   updateBranding(); syncFunnelUI(); syncChannelUI();
-  initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage();
+  initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountQual();
   if(history.replaceState){ history.replaceState(null,'', location.pathname+'?funnel='+key+(location.hash||'')); }
 }
 function initFunnels(){
@@ -502,5 +559,5 @@ function initFunnels(){
 }
 
 if(!funnels.length || (!daily.length && !grain.length)){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
-else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); }
+else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountQual(); }
 })();

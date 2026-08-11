@@ -201,6 +201,31 @@ b{font-weight:700}
 .rate-hero.cy .rh-val{color:var(--cy2)} .rate-hero.gr .rh-val{color:var(--good)}
 .stat.resp .s-v{color:var(--cy2)} .stat.grp .s-v{color:var(--good)}
 
+/* ---------- lead qualificado (perfil comprador) ---------- */
+:root{--gold:#f0b64d;--gold2:#ffd27a;--gold-dim:rgba(240,182,77,.13)}
+.kpi-card.qualcard .kpi-main{border-left-color:var(--gold);background:linear-gradient(135deg,rgba(240,182,77,.16),transparent),var(--panel2)}
+.kpi-card.qualcard .m-val{color:var(--gold2)}
+.qtag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--gold2);background:var(--gold-dim);border:1px solid rgba(240,182,77,.35);border-radius:6px;padding:1px 5px;margin-left:5px;vertical-align:middle}
+.qnum{color:var(--gold2)}
+.muted3{color:var(--muted2)}
+.tbl th.sortable[data-sort="qual"].act,.tbl th.sortable[data-sort="cplq"].act{color:var(--gold2)}
+.stat.qgold{background:linear-gradient(180deg,rgba(240,182,77,.14),var(--panel));border-color:rgba(240,182,77,.4)}
+.stat.qgold .s-v{color:var(--gold2)}
+.rate-hero.qgold .rh-val{color:var(--gold2)}
+.qualwrap>.card-h{color:var(--gold2)}
+.qch-row{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap}
+.qch{flex:1;min-width:120px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.qch-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.qch-h .cdot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.qch-v{font-size:20px;font-weight:700;color:var(--ink);margin-top:3px}.qch-v small{font-size:11px;color:var(--muted2);font-weight:600}
+.qch-s{font-size:11px;color:var(--muted);margin-top:2px}
+.qprofile{display:flex;flex-direction:column;gap:0}
+.qdim{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13px}
+.qdim:last-of-type{border-bottom:none}
+.qd-q{font-weight:700;color:var(--ink2)}.qd-h{color:var(--muted);font-size:12px;text-align:right}
+.qnote{margin-top:12px;padding:11px 13px;background:var(--gold-dim);border:1px solid rgba(240,182,77,.3);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.55}
+.qnote b{color:var(--ink2)} .qnote b.qnum{color:var(--gold2)}
+
 .foot{color:var(--muted2);font-size:11.5px;text-align:center;margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
 .foot b{color:var(--muted)}
 .empty{color:var(--muted2);font-size:12.5px;padding:14px 2px;text-align:center}
