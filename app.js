@@ -329,8 +329,8 @@ function barList(list,cls,total){ list=arr(list); var max=Math.max.apply(null,li
 }
 /* fontes de leads: cor + tipo por rótulo (label vem do Channel() no build) */
 var SRCMETA={
-  'Facebook Ads':{kind:'ads',dot:'#22d3ee'}, 'Google Ads':{kind:'ads',dot:'#8b7cf0'}, 'TikTok':{kind:'ads',dot:'#00d1c9'},
-  'Instagram':{kind:'org',dot:'#e46aa7'}, 'YouTube':{kind:'org',dot:'#ff5a5a'},
+  'Facebook Ads':{kind:'ads',dot:'#22d3ee'}, 'Google Ads':{kind:'ads',dot:'#8b7cf0'},
+  'TikTok':{kind:'org',dot:'#00d1c9'}, 'Instagram':{kind:'org',dot:'#e46aa7'}, 'YouTube':{kind:'org',dot:'#ff5a5a'},
   'ManyChat':{kind:'msg',dot:'#5b8def'}, 'WhatsApp':{kind:'msg',dot:'#25d366'}
 };
 var KINDLAB={ads:'Pago',org:'Orgânico',msg:'Mensageria',out:'Outros'};
