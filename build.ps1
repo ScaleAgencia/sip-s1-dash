@@ -93,13 +93,18 @@ function IsPaid($src,$med){ $m=Deaccent $med; $s=Deaccent $src
   if($m -match 'pago' -or $m -match 'cpc' -or $m -match 'paid' -or $m -match 'ppc'){ return $true }
   if($s -eq 'facebook-ads' -or $s -eq 'fb-ads'){ return $true }
   return $false }
-# canal de origem (rotulo curto p/ o breakdown)
+# canal/fonte de origem (rotulo p/ o breakdown de fontes). ASCII-only (front prettifica).
+# utm_source VAZIA = TikTok: o pixel do TikTok nao popula utm (confirmado 08/2026 - 100%
+# dos leads sem utm caem na landing do funil). Nao afeta atribuicao (essa usa utm_campaign).
 function Channel($src){ $s=Deaccent $src
-  if($s -eq ''){ return 'Direto / sem origem' }
-  if($s -eq 'facebook-ads' -or $s -eq 'facebook' -or $s -eq 'fb'){ return 'Facebook Ads' }
-  if($s -eq 'instagram' -or $s -eq 'ig'){ return 'Instagram' }
+  if($s -eq ''){ return 'TikTok' }
+  if($s -eq 'facebook-ads' -or $s -eq 'fb-ads' -or $s -eq 'facebook' -or $s -eq 'fb'){ return 'Facebook Ads' }
+  if($s -like 'google*'){ return 'Google Ads' }
+  if($s -like 'instagram*' -or $s -eq 'ig'){ return 'Instagram' }
   if($s -eq 'youtube' -or $s -eq 'yt'){ return 'YouTube' }
-  if($s -eq 'google' -or $s -like 'google*'){ return 'Google' }
+  if($s -like 'tiktok*'){ return 'TikTok' }
+  if($s -eq 'manychat'){ return 'ManyChat' }
+  if($s -eq 'whatsapp' -or $s -eq 'wpp'){ return 'WhatsApp' }
   return (TitleFirst $src) }
 # lead de teste: e-mail da agencia, ou source/medium = "teste*"
 function IsTest($mail,$src,$med){

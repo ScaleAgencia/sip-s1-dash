@@ -327,6 +327,26 @@ function barList(list,cls,total){ list=arr(list); var max=Math.max.apply(null,li
     return '<div class="qbar"><div class="qbar-top"><span class="l" title="'+esc(x.label)+'">'+esc(x.label)+'</span><span class="n">'+intf(x.n)+p+'</span></div>'
       +'<div class="qbar-track '+(cls||'')+'"><span style="width:'+Math.max(4,x.n/max*100)+'%"></span></div></div>'; }).join('');
 }
+/* fontes de leads: cor + tipo por rótulo (label vem do Channel() no build) */
+var SRCMETA={
+  'Facebook Ads':{kind:'ads',dot:'#22d3ee'}, 'Google Ads':{kind:'ads',dot:'#8b7cf0'}, 'TikTok':{kind:'ads',dot:'#00d1c9'},
+  'Instagram':{kind:'org',dot:'#e46aa7'}, 'YouTube':{kind:'org',dot:'#ff5a5a'},
+  'ManyChat':{kind:'msg',dot:'#5b8def'}, 'WhatsApp':{kind:'msg',dot:'#25d366'}
+};
+var KINDLAB={ads:'Pago',org:'Orgânico',msg:'Mensageria',out:'Outros'};
+function srcMeta(l){ return SRCMETA[l] || {kind:'out',dot:'#8093b3'}; }
+function renderSources(list,total){
+  list=arr(list).slice().sort(function(a,b){return b.n-a.n;});
+  if(!list.length){ el('sourcesBox').innerHTML='<div class="empty">Sem dados.</div>'; el('srcMix').innerHTML=''; return; }
+  var max=Math.max.apply(null,list.map(function(x){return x.n;}).concat([1]));
+  var mix={ads:0,org:0,msg:0,out:0}; list.forEach(function(x){ mix[srcMeta(x.label).kind]+=x.n; });
+  el('srcMix').innerHTML=[['ads','Pago (ads)'],['org','Orgânico'],['msg','Mensageria'],['out','Outros']].filter(function(k){return mix[k[0]]>0;}).map(function(k){
+    return '<div class="mixpill '+k[0]+'"><span class="mx-v">'+intf(mix[k[0]])+'</span><span class="mx-l">'+k[1]+' · '+pct(dv(mix[k[0]],total)*100)+'</span></div>'; }).join('');
+  el('sourcesBox').innerHTML=list.map(function(x){ var m=srcMeta(x.label);
+    return '<div class="srcrow"><div class="src-l"><span class="dot" style="background:'+m.dot+'"></span><b>'+esc(x.label)+'</b><span class="src-kind '+m.kind+'">'+KINDLAB[m.kind]+'</span></div>'
+      +'<div class="src-track"><span style="width:'+Math.max(3,x.n/max*100)+'%;background:'+m.dot+'"></span></div>'
+      +'<div class="src-n">'+intf(x.n)+' <small>'+pct(dv(x.n,total)*100)+'</small></div></div>'; }).join('');
+}
 function mountLeads(){
   var t=totals, total=t.leads||0, paid=t.paid||0, org=t.organic||0, spend=t.spend||0;
   var paidFrac=dv(paid,total);
@@ -354,8 +374,8 @@ function mountLeads(){
     +'<tr><td><span class="chip-org">Orgânico / sem rastreio</span></td><td class="num">'+intf(org)+'</td><td class="num">'+(total?pct(dv(org,total)*100):'—')+'</td><td class="num">—</td></tr>'
     +'<tr style="font-weight:800"><td>Total</td><td class="num">'+intf(total)+'</td><td class="num">100%</td><td class="num">'+(total?money0(dv(spend,total)):'—')+'</td></tr>';
   el('sourceTbl').innerHTML=head+'<tbody>'+body+'</tbody>';
-  // canais
-  el('channelBars').innerHTML=barList(arr(D.channels),'vi',total);
+  // fontes de leads (rico, por utm_source · utm vazia = TikTok)
+  renderSources(arr(D.channels), total);
   // geo
   el('geoBars').innerHTML=barList(geo.slice(0,14),'gr',total);
   // ranking de anuncios

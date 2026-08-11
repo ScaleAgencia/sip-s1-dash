@@ -82,21 +82,22 @@
 
     <div id="leadsStats"></div>
 
+    <div class="card srcwrap">
+      <div class="card-h">Fontes de leads · de onde vêm <span class="hint">por utm_source · <b>utm vazia = TikTok</b> (pixel do TikTok não popula utm)</span></div>
+      <div id="srcMix" class="src-mix"></div>
+      <div id="sourcesBox"></div>
+    </div>
+
     <div class="row-2">
       <div class="card">
-        <div class="card-h">Pago x Orgânico <span class="hint">de onde vêm os leads</span></div>
+        <div class="card-h">Pago x Orgânico <span class="hint">de onde vêm os leads (por utm_medium)</span></div>
         <div id="thermoSrc"></div>
         <div class="table-scroll"><table class="tbl" id="sourceTbl"></table></div>
       </div>
       <div class="card">
-        <div class="card-h">Canais de origem <span class="hint">utm_source de cada lead</span></div>
-        <div id="channelBars"></div>
+        <div class="card-h">Distribuição geográfica <span class="hint">estado de cada lead (por IP) · top 14</span></div>
+        <div id="geoBars"></div>
       </div>
-    </div>
-
-    <div class="card">
-      <div class="card-h">Distribuição geográfica <span class="hint">estado de cada lead (por IP) · top 14</span></div>
-      <div id="geoBars"></div>
     </div>
 
     <div class="card">

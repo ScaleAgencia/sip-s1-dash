@@ -193,6 +193,28 @@ b{font-weight:700}
 .qbar-track.vi span{background:linear-gradient(90deg,#6d5de0,var(--vi2))}
 .qbar-track.gr span{background:linear-gradient(90deg,#1f9c73,var(--good))}
 
+/* ---------- fontes de leads ---------- */
+.src-mix{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.mixpill{display:flex;flex-direction:column;gap:1px;padding:8px 14px;border-radius:11px;background:var(--bg2);border:1px solid var(--line);min-width:120px}
+.mixpill .mx-v{font-size:21px;font-weight:700;letter-spacing:-.5px;line-height:1.05}
+.mixpill .mx-l{font-size:11px;color:var(--muted);font-weight:600}
+.mixpill.ads{border-color:rgba(34,211,238,.4)} .mixpill.ads .mx-v{color:var(--cy2)}
+.mixpill.org{border-color:rgba(228,106,167,.4)} .mixpill.org .mx-v{color:#f2a0c8}
+.mixpill.msg{border-color:rgba(91,141,239,.4)} .mixpill.msg .mx-v{color:#93b4ff}
+.mixpill.out .mx-v{color:var(--ink2)}
+.srcrow{display:grid;grid-template-columns:minmax(180px,1fr) 2fr auto;align-items:center;gap:14px;padding:9px 2px;border-bottom:1px solid var(--line)}
+.srcrow:last-child{border-bottom:none}
+.src-l{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink)}
+.src-l .dot{width:11px;height:11px;border-radius:50%;flex:none}
+.src-kind{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;border-radius:6px;flex:none}
+.src-kind.ads{color:var(--cy2);background:rgba(34,211,238,.13)} .src-kind.org{color:#f2a0c8;background:rgba(228,106,167,.13)}
+.src-kind.msg{color:#93b4ff;background:rgba(91,141,239,.13)} .src-kind.out{color:var(--muted);background:var(--panel3)}
+.src-track{height:11px;background:var(--panel3);border-radius:6px;overflow:hidden}
+.src-track span{display:block;height:100%;border-radius:6px;opacity:.9}
+.src-n{font-size:14px;font-weight:700;color:var(--ink2);text-align:right;white-space:nowrap}
+.src-n small{color:var(--muted2);font-weight:500;font-size:11.5px;margin-left:4px}
+@media(max-width:620px){.srcrow{grid-template-columns:1fr auto}.srcrow .src-track{display:none}}
+
 /* ---------- pesquisa & grupos ---------- */
 .rate-hero{display:flex;align-items:baseline;gap:14px;margin-bottom:10px;flex-wrap:wrap}
 .rate-hero .rh-val{font-size:40px;font-weight:700;letter-spacing:-1.5px;line-height:1}
