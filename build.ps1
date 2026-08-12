@@ -18,10 +18,12 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $FUNNELS = @(
   [ordered]@{ key='s1';  label='SIP-S1';
     queriesId='1WKRLwQpK4xcoQENOZPk01qROgbTL9vLqTxyp8sfo_9A'; metaGid='0'; googleGid='1609119011';
-    leadsId='1nTJYpjYLlK8ZOfA-V9faNSuqz-oegrhccmOgGvrEzm0';   leadsGid='566747937' }
+    leadsId='1nTJYpjYLlK8ZOfA-V9faNSuqz-oegrhccmOgGvrEzm0';   leadsGid='566747937'
+    goalSpend=0; goalDate='' }
   [ordered]@{ key='l21'; label='SIP-L21';
     queriesId='1MzEn8jtxvEQbAWgA1Btg1cL5Q-mB3oA8KygVJfrgszo'; metaGid='0'; googleGid='1609119011';
-    leadsId='19vondd8YlTF4f-nhu3guZAocwqrJz0ofEplbAYEbp5s';   leadsGid='1648797035' }
+    leadsId='19vondd8YlTF4f-nhu3guZAocwqrJz0ofEplbAYEbp5s';   leadsGid='1648797035'
+    goalSpend=480000; goalDate='2026-09-14' }   # meta de investimento c/ imposto ate 14/09
 )
 $TAX  = 1.1385          # imposto Meta (+13,85%) aplicado no gasto do Meta
 $TAXG = 1.0             # Google Ads NAO tem imposto
@@ -372,6 +374,7 @@ function Build-Funnel($cfg){
   $payload=[pscustomobject]@{
     key=$cfg.key; label=$cfg.label; funnel=$cfg.label; leadsOk=$leadsOk
     taxMultiplier=$TAX; taxGoogle=$TAXG
+    goal=[pscustomobject]@{ spend=[double]$cfg.goalSpend; date=[string]$cfg.goalDate }
     dateMin=$(if($dates.Count){$dates[0]}else{''}); dateMax=$(if($dates.Count){$dates[-1]}else{''})
     leadDateMin=$(if($leadDates.Count){$leadDates[0]}else{''}); leadDateMax=$(if($leadDates.Count){$leadDates[-1]}else{''})
     totals=$tot; byChannel=@($byChannel); bySource=@($bySource)

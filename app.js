@@ -493,6 +493,51 @@ function mountQual(){
   else { el('qualByCh').innerHTML=''; }
 }
 
+/* =================== META DE INVESTIMENTO (pacing) =================== */
+function todayISO(){ var d=new Date(),m=d.getMonth()+1,day=d.getDate(); return d.getFullYear()+'-'+(m<10?'0'+m:m)+'-'+(day<10?'0'+day:day); }
+function mountGoal(){
+  var box=el('goalWrap'); if(!box) return;
+  var G=D.goal||{}, goal=+G.spend||0, deadline=G.date||'';
+  if(!(goal>0) || !deadline){ box.innerHTML=''; return; }
+  var spent=totals.spend||0, tISO=todayISO();
+  var remaining=Math.max(0,goal-spent), pctDone=clamp(goal>0?spent/goal:0);
+  var daysLeft = tISO<=deadline ? daysBetween(tISO,deadline)+1 : 0;      // inclui hoje
+  var dailyNeeded = daysLeft>0 ? remaining/daysLeft : 0;
+  var byDate={}; daily.forEach(function(d){ if(!isDate(d.date))return; byDate[d.date]=(byDate[d.date]||0)+(d.spend||0); });
+  var dts=Object.keys(byDate).sort(), last7=dts.slice(-7);
+  var recentAvg = last7.length ? last7.reduce(function(s,k){return s+byDate[k];},0)/last7.length : 0;
+  var projected = spent + recentAvg*daysLeft, deltaDaily = dailyNeeded-recentAvg, dl=fmtBR(deadline);
+  var done=spent>=goal, over=daysLeft<=0;
+  var heroVal = done?'Meta atingida 🎉':over?'Prazo encerrado':money0(dailyNeeded)+'<span class="gh-u">/dia</span>';
+  var heroLab = done?'você já bateu os '+money0(goal):over?'o prazo de '+dl+' passou':'invista por dia até <b>'+dl+'</b> p/ bater a meta';
+  var start=dts.length?dts[0]:tISO, totalDays=Math.max(1,daysBetween(start,deadline)+1), elapsed=Math.max(0,Math.min(totalDays,daysBetween(start,tISO)+1));
+  var idealFrac=clamp(elapsed/totalDays), idealSpent=goal*idealFrac, behind=spent<idealSpent;
+  var paceNote;
+  if(done){ paceNote='Investimento acumulado já alcançou a meta.'; }
+  else if(over){ paceNote='Faltaram <b>'+money0(remaining)+'</b> para a meta de '+money0(goal)+'.'; }
+  else {
+    paceNote='No ritmo atual (~<b>'+money0(recentAvg)+'</b>/dia) você chega a <b>'+money0(projected)+'</b> em '+dl+' — '
+      +(projected>=goal?'<b class="g-ok">supera a meta</b>.':'<b class="g-bad">'+money0(goal-projected)+' abaixo</b>.')
+      +(deltaDaily>1?' Precisa <b class="g-bad">acelerar +'+money0(deltaDaily)+'/dia</b> ('+nf1.format(recentAvg>0?dailyNeeded/recentAvg:0)+'× o ritmo de hoje).':' O ritmo atual já cobre o necessário ✓.');
+  }
+  box.innerHTML='<div class="card goalcard">'
+    +'<div class="card-h">🎯 Meta de investimento <span class="hint">R$ '+nf0.format(goal)+' (com impostos) até '+dl+' · o valor/dia se reajusta sozinho a cada dia e a cada atualização</span></div>'
+    +'<div class="goal-grid">'
+      +'<div class="goal-hero'+(behind&&!done&&!over?' behind':(done?' okdone':''))+'"><div class="gh-val">'+heroVal+'</div><div class="gh-lab">'+heroLab+'</div></div>'
+      +'<div class="goal-side">'
+        +'<div class="goal-bar"><div class="gb-track"><span class="gb-fill" style="width:'+(pctDone*100).toFixed(1)+'%"></span>'
+          +(idealFrac>0&&idealFrac<1?'<span class="gb-ideal" style="left:'+(idealFrac*100).toFixed(1)+'%"></span>':'')+'</div>'
+          +'<div class="gb-legend"><span>Investido <b>'+money0(spent)+'</b> ('+pct(pctDone*100)+')</span><span class="gb-ideal-l">▏ritmo ideal hoje</span><span>Meta <b>'+money0(goal)+'</b></span></div></div>'
+        +'<div class="goal-chips">'
+          +'<div class="gchip"><div class="gc-v">'+money0(remaining)+'</div><div class="gc-l">falta investir</div></div>'
+          +'<div class="gchip"><div class="gc-v">'+intf(daysLeft)+'</div><div class="gc-l">dias restantes</div></div>'
+          +'<div class="gchip"><div class="gc-v">'+money0(recentAvg)+'</div><div class="gc-l">ritmo atual /dia</div></div>'
+        +'</div>'
+      +'</div>'
+    +'</div>'
+    +'<div class="goal-note">'+paceNote+'</div></div>';
+}
+
 /* =================== CHROME =================== */
 function periodsHTML(){
   return PRESETS.map(function(p){return '<button data-k="'+p.k+'" class="pbtn">'+p.label+'</button>';}).join('')
@@ -564,7 +609,7 @@ function switchFunnel(key){
   funKey=key; setFunnelVars();
   period='tudo'; customRange=null; channel='geral'; treeInited=false; expanded={};
   updateBranding(); syncFunnelUI(); syncChannelUI();
-  initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountQual();
+  initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountQual(); mountGoal();
   if(history.replaceState){ history.replaceState(null,'', location.pathname+'?funnel='+key+(location.hash||'')); }
 }
 function initFunnels(){
@@ -579,5 +624,5 @@ function initFunnels(){
 }
 
 if(!funnels.length || (!daily.length && !grain.length)){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
-else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountQual(); }
+else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountQual(); mountGoal(); }
 })();
