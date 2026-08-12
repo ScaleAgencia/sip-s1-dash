@@ -108,6 +108,17 @@ function Channel($src){ $s=Deaccent $src
   if($s -eq 'manychat'){ return 'ManyChat' }
   if($s -eq 'whatsapp' -or $s -eq 'wpp'){ return 'WhatsApp' }
   return (TitleFirst $src) }
+# fonte GRANULAR p/ o diario por rede: separa placement do organico via utm_term (bio/direct/...).
+function SourceGran($src,$med,$term){ $s=Deaccent $src; $t=Deaccent $term
+  if($s -eq ''){ return 'TikTok' }
+  if($s -eq 'facebook-ads' -or $s -eq 'fb-ads' -or $s -eq 'facebook' -or $s -eq 'fb'){ return 'Facebook Ads' }
+  if($s -like 'google*'){ return 'Google Ads' }
+  if($s -like 'instagram*' -or $s -eq 'ig'){ if($t -eq 'bio'){return 'Insta bio'}; if($t -eq 'direct'){return 'Insta direct'}; if($t -ne ''){return 'Insta '+$t}; return 'Instagram' }
+  if($s -eq 'youtube' -or $s -eq 'yt'){ return 'YouTube' }
+  if($s -like 'tiktok*'){ return 'TikTok' }
+  if($s -eq 'manychat'){ return 'ManyChat' }
+  if($s -eq 'whatsapp' -or $s -eq 'wpp'){ return 'WhatsApp' }
+  return (TitleFirst $src) }
 # lead de teste: e-mail da agencia, ou source/medium = "teste*"
 function IsTest($mail,$src,$med){
   if((Deaccent $mail) -like "*$AGENCY*"){ return $true }
@@ -242,6 +253,7 @@ function Build-Funnel($cfg){
   # ---- leads: filtra teste, classifica origem e atribui --------------
   $leadRows=New-Object System.Collections.Generic.List[object]
   $dState=@{}; $dCity=@{}; $dChannel=@{}; $leadMails=@{}; $nTest=0
+  $srcDay=@{}; $paidDay=@{}; $srcTot=@{}   # diario por rede + pago/org por dia
   if($leadsOk){ foreach($r in $ld){
     if($null -eq $r -or $r.Count -le $L_UCAMP){ continue }
     $mail=Norm $r[$L_MAIL]
@@ -263,6 +275,15 @@ function Build-Funnel($cfg){
       $g=GetGrain $plat $d $cName $sName $aName; $g.leads++
     } else { $cName=$SENT; $sName=$SENT; $aName=$SENT }
     Bump $dState $stt; Bump $dCity $cty; Bump $dChannel $chan
+    # ---- diario: leads por rede (granular) + pago/org por dia ----
+    if($d -match '^\d{4}-\d{2}-\d{2}$'){
+      $rede = SourceGran $src $med $term
+      if(-not $srcTot.ContainsKey($rede)){ $srcTot[$rede]=0 }; $srcTot[$rede]++
+      if(-not $srcDay.ContainsKey($d)){ $srcDay[$d]=@{} }
+      if(-not $srcDay[$d].ContainsKey($rede)){ $srcDay[$d][$rede]=0 }; $srcDay[$d][$rede]++
+      if(-not $paidDay.ContainsKey($d)){ $paidDay[$d]=@{pago=0;org=0} }
+      if($paid){ $paidDay[$d].pago++ } else { $paidDay[$d].org++ }
+    }
     $em=$mail.ToLower(); if($em -ne ''){ $leadMails[$em]=$true }
     $leadRows.Add([pscustomobject]@{date=$d;paid=$paid;channel=$chan;plat=$plat;state=$stt;camp=$cName;adset=$sName;ad=$aName;qmail=$em})
   } }
@@ -352,6 +373,16 @@ function Build-Funnel($cfg){
   $dates=@($dailyArr | Where-Object { $_.date -match '^\d{4}-\d{2}-\d{2}$' } | ForEach-Object { $_.date } | Sort-Object -Unique)
   $leadDates=@($leadRows | Where-Object { $_.date -match '^\d{4}-\d{2}-\d{2}$' } | ForEach-Object { $_.date } | Sort-Object)
 
+  # ---- diario: leads por rede (ordenado por volume) + pago/org por dia ----
+  $srcOrder = @($srcTot.GetEnumerator() | Sort-Object Value -Descending | ForEach-Object { $_.Key })
+  $srcDaily = @()
+  foreach($dt in ($srcDay.Keys | Sort-Object)){ if($dt -notmatch '^\d{4}-\d{2}-\d{2}$'){continue}
+    $vals=[ordered]@{}; foreach($lbl in $srcOrder){ if($srcDay[$dt].ContainsKey($lbl)){ $vals[$lbl]=$srcDay[$dt][$lbl] } }
+    $srcDaily += [pscustomobject]@{ date=$dt; vals=[pscustomobject]$vals } }
+  $paidDaily = @()
+  foreach($dt in ($paidDay.Keys | Sort-Object)){ if($dt -notmatch '^\d{4}-\d{2}-\d{2}$'){continue}
+    $paidDaily += [pscustomobject]@{ date=$dt; pago=[int]$paidDay[$dt].pago; org=[int]$paidDay[$dt].org } }
+
   $paidCount=@($leadRows|Where-Object{$_.paid}).Count
   $attribCount=@($leadRows|Where-Object{$_.plat -ne ''}).Count
   $metaDaily=@($dailyArr|Where-Object{$_.channel -eq 'meta'}); $gglDaily=@($dailyArr|Where-Object{$_.channel -eq 'google'})
@@ -379,6 +410,7 @@ function Build-Funnel($cfg){
     leadDateMin=$(if($leadDates.Count){$leadDates[0]}else{''}); leadDateMax=$(if($leadDates.Count){$leadDates[-1]}else{''})
     totals=$tot; byChannel=@($byChannel); bySource=@($bySource)
     channels=(DistArr $dChannel); geo=(DistArr $dState); cities=(DistArr $dCity)
+    srcOrder=@($srcOrder); srcDaily=@($srcDaily); paidDaily=@($paidDaily)
     engage=[pscustomobject]@{
       leads=$leadRows.Count
       survey=[pscustomobject]@{ total=$survTotal; completed=$survDone; incomplete=$survInc; respondedLeads=$respLeads; distinctLeads=$leadMails.Count }
