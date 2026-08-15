@@ -27,15 +27,17 @@ function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 var COL={cy:'#22d3ee',cy2:'#67e8f9',vi:'#8b7cf0',vi2:'#a99bf7',good:'#34d399',warn:'#f5b041',bad:'#f2637e',gold:'#f0b64d',gold2:'#ffd27a'};
 /* leadscoring A/B/C (docs L17-L20): A=perseguir, B=miolo, C=cortar */
 var ABC={A:'#34d399',B:'#f5b041',C:'#f2637e'};
-/* aba Perfil do Lead: legenda das respostas (pos = índice na linha resp [date,cls,idade,mom,renda,dispon,invest,curso]) */
+/* aba Perfil do Lead: legenda das respostas (pos = índice na linha resp [date,cls,idade,mom,renda,dispon,invest,curso])
+   buyer = distribuição % das respostas entre COMPRADORES Prosperus (L17–L20, 595 compradores cruzados) */
 var PROFQ=[
-  {pos:2, q:'Idade', opts:['18 a 24','25 a 30','31 a 39','40 a 49','50 anos ou +']},
-  {pos:3, q:'Momento profissional', opts:['CLT','Autônomo / MEI','Servidor público','Não trabalhando','Estudante','Aposentado / Pensionista','Outro']},
-  {pos:4, q:'Renda mensal', opts:['Não possui','Menos de R$1k','R$1–2k','R$2–5k','R$5–10k','Mais de R$10k']},
-  {pos:5, q:'Disponível p/ investir', opts:['Até R$100','R$100–500','R$500–1k','R$1–5k','Mais de R$5k']},
-  {pos:6, q:'Patrimônio já investido', opts:['Ainda não','Até R$10k','R$10–50k','R$50–100k','R$100–500k','R$500k–1M','Mais de R$1M']},
-  {pos:7, q:'Já comprou curso', opts:['Não','Sim','Sim, sou aluno']}
+  {pos:2, q:'Idade', opts:['18 a 24','25 a 30','31 a 39','40 a 49','50 anos ou +'], buyer:[2,6.2,14.2,34.3,43.2]},
+  {pos:3, q:'Momento profissional', opts:['CLT','Autônomo / MEI','Servidor público','Não trabalhando','Estudante','Aposentado / Pensionista','Outro'], buyer:[28,26.2,21.1,10.3,1,7.1,6.2]},
+  {pos:4, q:'Renda mensal', opts:['Não possui','Menos de R$1k','R$1–2k','R$2–5k','R$5–10k','Mais de R$10k'], buyer:[2.5,4.1,18.3,41,23.2,10.8]},
+  {pos:5, q:'Disponível p/ investir', opts:['Até R$100','R$100–500','R$500–1k','R$1–5k','Mais de R$5k'], buyer:[14.9,39,26.8,13.8,5.4]},
+  {pos:6, q:'Patrimônio já investido', opts:['Ainda não','Até R$10k','R$10–50k','R$50–100k','R$100–500k','R$500k–1M','Mais de R$1M'], buyer:[54.5,24.2,10.8,5.2,3,1.4,0.8]},
+  {pos:7, q:'Já comprou curso', opts:['Não','Sim','Sim, sou aluno'], buyer:[67.6,26.1,6.3]}
 ];
+var PROSPERUS_ABC={A:53.1,B:43.7,C:3.2};  // A/B/C dos compradores
 
 var daily = arr(D.daily), grain = arr(D.grain), totals = D.totals||{};
 var allDates = daily.map(function(d){return d.date;}).filter(isDate).sort();
@@ -544,6 +546,53 @@ function mountProfile(){
     html+='<div class="pf-q"><div class="pf-qh">'+esc(Q.q)+'</div>'+bars+'</div>';
   });
   el('profDist').innerHTML=html;
+  renderProfileCompare(rows, tot);
+}
+/* ---- comparação leads agora × compradores Prosperus (pizzas por pergunta) ---- */
+function rampColor(t){ var s=[[242,99,126],[245,176,65],[52,211,153]],a,b,f;
+  if(t<=0.5){a=s[0];b=s[1];f=t*2;}else{a=s[1];b=s[2];f=(t-0.5)*2;}
+  return 'rgb('+Math.round(a[0]+(b[0]-a[0])*f)+','+Math.round(a[1]+(b[1]-a[1])*f)+','+Math.round(a[2]+(b[2]-a[2])*f)+')'; }
+function optColors(n){ var c=[]; for(var i=0;i<n;i++)c.push(rampColor(n>1?i/(n-1):0.5)); return c; }
+function adColor(v){ return v>=75?ABC.A:(v>=58?ABC.B:ABC.C); }
+function pieSvg(pcts, colors, size, labels){
+  var cx=size/2, cy=size/2, rO=size/2-2, rI=rO*0.58, tot=0; pcts.forEach(function(v){tot+=(v||0);});
+  var s='<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'">';
+  if(tot<=0){ return s+'<circle cx="'+cx+'" cy="'+cy+'" r="'+((rO+rI)/2).toFixed(1)+'" fill="none" stroke="#1a2740" stroke-width="'+(rO-rI).toFixed(1)+'"/></svg>'; }
+  var ang=-Math.PI/2;
+  pcts.forEach(function(v,i){ if(!v||v<=0)return; var frac=v/tot, a1=ang+frac*2*Math.PI, ti='<title>'+esc(labels[i])+' '+nf1.format(frac*100)+'%</title>';
+    if(frac>=0.999){ s+='<circle cx="'+cx+'" cy="'+cy+'" r="'+((rO+rI)/2).toFixed(1)+'" fill="none" stroke="'+colors[i]+'" stroke-width="'+(rO-rI).toFixed(1)+'">'+ti+'</circle>'; ang=a1; return; }
+    var large=(a1-ang)>Math.PI?1:0, x0=(cx+rO*Math.cos(ang)).toFixed(1), y0=(cy+rO*Math.sin(ang)).toFixed(1), x1=(cx+rO*Math.cos(a1)).toFixed(1), y1=(cy+rO*Math.sin(a1)).toFixed(1),
+        xi1=(cx+rI*Math.cos(a1)).toFixed(1), yi1=(cy+rI*Math.sin(a1)).toFixed(1), xi0=(cx+rI*Math.cos(ang)).toFixed(1), yi0=(cy+rI*Math.sin(ang)).toFixed(1);
+    s+='<path d="M'+x0+' '+y0+' A'+rO+' '+rO+' 0 '+large+' 1 '+x1+' '+y1+' L'+xi1+' '+yi1+' A'+rI+' '+rI+' 0 '+large+' 0 '+xi0+' '+yi0+' Z" fill="'+colors[i]+'">'+ti+'</path>'; ang=a1; });
+  return s+'</svg>';
+}
+function renderProfileCompare(rows, tot){
+  if(!el('profPies')) return;
+  var cA=0; rows.forEach(function(r){ if(abcOf(r[1])==='A')cA++; });
+  var aNow=dv(cA,tot)*100, aBuy=PROSPERUS_ABC.A, overlaps=[], pies='';
+  PROFQ.forEach(function(Q){
+    var n=Q.opts.length, cnt=[]; for(var i=0;i<n;i++)cnt[i]=0; var qt=0;
+    rows.forEach(function(r){ var idx=r[Q.pos]; if(idx==null||idx<0||idx>=n)return; cnt[idx]++; qt++; });
+    var leadPct=cnt.map(function(c){return dv(c,qt)*100;}), buyPct=Q.buyer, cols=optColors(n), ov=0;
+    for(var i=0;i<n;i++) ov+=Math.min(leadPct[i]||0, buyPct[i]||0);
+    overlaps.push(ov);
+    var leg=Q.opts.map(function(o,i){ return '<span class="pc-lg"><i style="background:'+cols[i]+'"></i>'+esc(o)+'</span>'; }).join('');
+    pies+='<div class="pcmp"><div class="pcmp-h">'+esc(Q.q)+' <span class="pcmp-ad" style="color:'+adColor(ov)+'">'+Math.round(ov)+'% igual</span></div>'
+      +'<div class="pcmp-body"><figure>'+pieSvg(leadPct,cols,118,Q.opts)+'<figcaption>Leads agora</figcaption></figure>'
+      +'<figure>'+pieSvg(buyPct,cols,118,Q.opts)+'<figcaption class="buyer">Prosperus</figcaption></figure></div>'
+      +'<div class="pcmp-leg">'+leg+'</div></div>';
+  });
+  var macro=overlaps.reduce(function(s,x){return s+x;},0)/(overlaps.length||1);
+  var verd = macro>=82?'Muito perto do perfil comprador':(macro>=70?'Perto do perfil comprador':(macro>=58?'Aderência média — dá pra melhorar':'Longe do perfil — mix precisa mudar'));
+  el('profMacro').innerHTML='<div class="macro"><div class="macro-gauge">'+pieSvg([macro,100-macro],[adColor(macro),'#1a2740'],154,['aderência',''])
+      +'<div class="mg-c"><span class="mg-v" style="color:'+adColor(macro)+'">'+Math.round(macro)+'%</span><span class="mg-l">aderência</span></div></div>'
+    +'<div class="macro-txt"><div class="macro-big" style="color:'+adColor(macro)+'">'+verd+'</div>'
+      +'<div class="macro-sub">O quanto o mix de leads de agora se parece com quem realmente comprou (<b>Prosperus</b>) — média das 6 perguntas. 100% = idêntico ao comprador.</div>'
+      +'<div class="macro-a"><div class="ma-lab">% de <b class="cA">Lead A</b> (o perfil que mais compra)</div>'
+        +'<div class="ma-row"><span>Leads agora</span><div class="ma-tr"><i style="width:'+Math.min(100,aNow).toFixed(1)+'%"></i></div><b>'+nf1.format(aNow)+'%</b></div>'
+        +'<div class="ma-row"><span>Prosperus</span><div class="ma-tr"><i class="buy" style="width:'+Math.min(100,aBuy).toFixed(1)+'%"></i></div><b>'+nf1.format(aBuy)+'%</b></div>'
+      +'</div></div></div>';
+  el('profPies').innerHTML=pies;
 }
 
 /* =================== META DE INVESTIMENTO (pacing) =================== */
