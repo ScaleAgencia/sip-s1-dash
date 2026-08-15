@@ -322,7 +322,8 @@ function Build-Funnel($cfg){
       if($pm -eq '' -and $pst -eq '' -and $pd -eq ''){ continue }
       $done = ($pst -eq 'completed' -or $pst -eq 'complete')
       $survTotal++; if($done){ $survDone++ } elseif($pst -eq 'incomplete'){ $survInc++ }
-      if($pm -ne ''){ $respMails[$pm]=$true
+      # SO classifica quem COMPLETOU (incompletos/em branco nao dao pra pontuar A/B/C e poluiriam)
+      if($done -and $pm -ne ''){ $respMails[$pm]=$true
         $vId=Cell $r $P_IDADE; $vMo=Cell $r $P_MOM; $vRe=Cell $r $P_RENDA; $vDi=Cell $r $P_DISPON; $vIn=Cell $r $P_INVEST; $vCu=Cell $r $P_CURSO
         # mantem a resposta MAIS RECENTE por e-mail (data desc); empate -> primeira
         if(-not $respProfile.ContainsKey($pm) -or ($pd -ne '' -and $pd -gt $respProfile[$pm].date)){
@@ -435,7 +436,7 @@ function Build-Funnel($cfg){
     srcOrder=@($srcOrder); srcDaily=@($srcDaily); paidDaily=@($paidDaily)
     engage=[pscustomobject]@{
       leads=$leadRows.Count
-      survey=[pscustomobject]@{ total=$survTotal; completed=$survDone; incomplete=$survInc; respondedLeads=$respLeads; distinctLeads=$leadMails.Count }
+      survey=[pscustomobject]@{ total=$survTotal; completed=$survDone; incomplete=$survInc; respondents=$respProfile.Count; respondedLeads=$respLeads; distinctLeads=$leadMails.Count }
       groups=[pscustomobject]@{ entered=$grpIn; left=$grpOut; net=($grpIn-$grpOut) }
       byDay=@($engByDay)
     }

@@ -485,15 +485,15 @@ function renderEngTable(rows){
 }
 function mountEngage(){
   var E=D.engage||{}, sv=E.survey||{}, gp=E.groups||{}, rows=arr(E.byDay), leads=E.leads||0;
-  var svRate=dv(sv.completed,leads), gpRate=dv(gp.entered,leads);
+  var resp=(sv.respondents!=null?sv.respondents:sv.completed)||0, svRate=dv(resp,leads), gpRate=dv(gp.entered,leads);
   el('engStats').innerHTML='<div class="stat-row" style="grid-template-columns:repeat(3,1fr)">'
     +'<div class="stat"><div class="s-v">'+intf(leads)+'</div><div class="s-l">Leads captados</div></div>'
-    +'<div class="stat resp"><div class="s-v">'+intf(sv.completed)+'</div><div class="s-l">Respostas de pesquisa</div></div>'
+    +'<div class="stat resp"><div class="s-v">'+intf(resp)+'</div><div class="s-l">Responderam a pesquisa <small>(completas)</small></div></div>'
     +'<div class="stat grp"><div class="s-v">'+intf(gp.net)+'</div><div class="s-l">Pessoas nos grupos</div></div></div>';
   var sh=el('surveyHero'); sh.className='rate-hero cy';
   sh.innerHTML='<span class="rh-val">'+pct(svRate*100)+'</span>'
-    +'<span class="rh-det"><b>'+intf(sv.completed)+'</b> respostas completas de <b>'+intf(leads)+'</b> leads'+(sv.incomplete?' · '+intf(sv.incomplete)+' incompletas':'')
-    +'<br>'+intf(sv.respondedLeads)+' leads distintos responderam <b>('+pct(dv(sv.respondedLeads,sv.distinctLeads)*100)+' dos leads)</b></span>';
+    +'<span class="rh-det"><b>'+intf(resp)+'</b> responderam a pesquisa (completa) de <b>'+intf(leads)+'</b> leads'+(sv.incomplete?' · '+intf(sv.incomplete)+' incompletas (não classificadas)':'')
+    +'<br>é essa base de <b>'+intf(resp)+'</b> que alimenta a classificação A/B/C da aba <b>Perfil do Lead</b></span>';
   renderRateChart('chartSurvey', rows, function(r){return r.survey;}, function(r){return dv(r.survey,r.leads);}, COL.cy, 'Respostas');
   var gh=el('groupHero'); gh.className='rate-hero gr';
   gh.innerHTML='<span class="rh-val">'+pct(gpRate*100)+'</span>'
