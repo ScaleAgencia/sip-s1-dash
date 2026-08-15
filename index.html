@@ -46,6 +46,7 @@
   <nav class="tabs" id="tabs">
     <button class="tab active" data-tab="funil">Funil &amp; Otimização</button>
     <button class="tab" data-tab="leads">Leads · Visão Geral</button>
+    <button class="tab" data-tab="perfil">Perfil do Lead</button>
     <button class="tab" data-tab="engaje">Pesquisa &amp; Grupos</button>
   </nav>
 
@@ -117,6 +118,25 @@
     </div>
   </section>
 
+  <!-- ============ PERFIL DO LEAD ============ -->
+  <section class="panel-tab hidden" id="tab-perfil">
+    <div class="card profwrap">
+      <div class="card-h">Perfil do Lead · classificação A / B / C <span class="hint">com base nas respostas da pesquisa cruzadas com os compradores dos lançamentos (L17–L20) · <b class="cA">A</b> perseguir · <b class="cB">B</b> miolo · <b class="cC">C</b> cortar</span></div>
+      <div class="prof-periods" id="profPeriods"></div>
+      <div id="profStats"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Leads por dia · A / B / C <span class="hint">barras empilhadas dos leads que responderam a pesquisa no período</span></div>
+      <div id="profChart"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">O que os leads estão respondendo <span class="hint">distribuição de cada pergunta · cada barra colorida pela composição <b class="cA">A</b>/<b class="cB">B</b>/<b class="cC">C</b></span></div>
+      <div id="profDist" class="prof-dist"></div>
+    </div>
+  </section>
+
   <!-- ============ PESQUISA & GRUPOS ============ -->
   <section class="panel-tab hidden" id="tab-engaje">
     <div id="engStats"></div>
@@ -137,26 +157,6 @@
     <div class="card">
       <div class="card-h">Resumo diário <span class="hint">leads, respostas de pesquisa e movimentação dos grupos por dia</span></div>
       <div class="table-scroll"><table class="tbl" id="engTbl"></table></div>
-    </div>
-
-    <div class="card qualwrap">
-      <div class="card-h">Qualificação de leads · perfil de comprador <span class="hint">quem tem o perfil que mais compra (cruzamento pesquisa × vendas dos lançamentos anteriores)</span></div>
-      <div id="qualStats"></div>
-      <div class="row-2">
-        <div class="card eng-card">
-          <div class="card-h">Taxa de lead qualificado <span class="hint">qualificados ÷ quem respondeu a pesquisa</span></div>
-          <div class="rate-hero" id="qualHero"></div>
-          <div id="qualByCh" class="qch-row"></div>
-        </div>
-        <div class="card eng-card">
-          <div class="card-h">Distribuição de score <span class="hint">nota 0–11 de cada lead que respondeu · ≥ corte = qualificado</span></div>
-          <div id="qualHist"></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-h">O que define um lead qualificado <span class="hint">pontos por resposta · derivado dos compradores reais</span></div>
-        <div id="qualProfile" class="qprofile"></div>
-      </div>
     </div>
   </section>
 

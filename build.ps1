@@ -127,20 +127,33 @@ function IsTest($mail,$src,$med){
   if($m -eq 'teste' -or $m -like 'teste[-_ ]*'){ return $true }
   return $false }
 
-# ---- LEAD QUALIFICADO -----------------------------------------------
-# Score do perfil comprador, derivado do cruzamento pesquisa x vendas
-# dos lancamentos L17+L18+L19 (42.086 respostas, 507 compradores,
-# baseline compra 1,20%). Pontos ~ proporcionais ao "lift" de cada
-# resposta. Corte >=6 => comprador ~2,3x mais provavel (buyRate 2,8%).
-$QUALMIN = 6
-function QScore($idade,$invest,$renda,$dispon,$curso){
-  $s=0
-  $r=Deaccent $renda;  if($r -like '*mais de r$10*'){$s+=3}elseif($r -like '*5.000 e r$10*'){$s+=2}elseif($r -like '*2.000 e r$5*'){$s+=1}
-  $d=Deaccent $dispon; if($d -like '*mais de r$5*'){$s+=3}elseif($d -like '*1.000 a r$5*'){$s+=3}elseif($d -like '*500 a r$1.000*'){$s+=2}elseif($d -like '*100 a r$500*'){$s+=1}
-  $i=Deaccent $invest; if($i -ne '' -and $i -notlike '*ainda nao investi*'){$s+=2}
-  $a=Deaccent $idade;  if($a -like '*mais de 50*'){$s+=2}elseif($a -like '*40 a 49*'){$s+=1}
-  $c=Deaccent $curso;  if($c -like 'sim*'){$s+=1}
-  return $s }
+# ---- LEAD SCORING A / B / C (perfil comprador, docs Prosperus L17-L20) --
+# Modelo dos 3 documentos (Protocolo de exclusao/escala, Diagnostico, Perfil):
+# 53.363 respondentes, 652 compradores, conversao media 1,22%. O eixo e
+# idade x CAPACIDADE FINANCEIRA. capacidade = renda >= R$5.000 OU disponivel
+# >= R$500/mes. A = perseguir; C = cortar; B = miolo (nem escalar nem cortar).
+#   A (perseguir): 40+ E (capacidade OU renda estavel de servidor/aposentado). Converte ~2,5% (2x media).
+#   C (cortar):    abaixo de 40 E disponivel = Ate R$100/mes. Converte ~0,27% (a pior faixa).
+#   B (miolo):     o resto.
+function HasCap($renda,$dispon){ $r=Deaccent $renda; $d=Deaccent $dispon
+  $rc = ($r -like '*5.000 e r$10*' -or $r -like '*mais de r$10*')
+  $dc = ($d -like '*500 a r$1.000*' -or $d -like '*1.000 a r$5*' -or $d -like '*mais de r$5*')
+  return ($rc -or $dc) }
+function Age40p($v){ $a=Deaccent $v; return ($a -like '*40 a 49*' -or $a -like '*mais de 50*') }
+function AgeUnder40($v){ $a=Deaccent $v; return ($a -like '*18 a 24*' -or $a -like '*25 a 30*' -or $a -like '*31 a 39*') }
+function LeadClass($idade,$momento,$renda,$dispon){
+  $m=Deaccent $momento; $d=Deaccent $dispon
+  $estavel = ($m -like '*servidor publico*' -or $m -like '*aposent*' -or $m -like '*pensionista*')
+  if( (Age40p $idade) -and ((HasCap $renda $dispon) -or $estavel) ){ return 'A' }
+  if( (AgeUnder40 $idade) -and ($d -like '*ate r$100*') ){ return 'C' }
+  return 'B' }
+# indices de resposta p/ a aba Perfil do Lead (0-based; -1 = nao respondeu/nao mapeado)
+function IdxIdade($v){ $a=Deaccent $v; if($a -like '*18 a 24*'){0}elseif($a -like '*25 a 30*'){1}elseif($a -like '*31 a 39*'){2}elseif($a -like '*40 a 49*'){3}elseif($a -like '*mais de 50*'){4}else{-1} }
+function IdxMomento($v){ $a=Deaccent $v; if($a -eq ''){-1}elseif($a -like '*clt*'){0}elseif($a -like '*autonomo*' -or $a -like '*mei*'){1}elseif($a -like '*servidor publico*'){2}elseif($a -like '*nao estou trabalhando*'){3}elseif($a -like '*estudante*'){4}elseif($a -like '*aposent*' -or $a -like '*pensionista*'){5}else{6} }
+function IdxRenda($v){ $a=Deaccent $v; if($a -like '*nao possuo*'){0}elseif($a -like '*menos de r$1.000*'){1}elseif($a -like '*1.000 e r$2*'){2}elseif($a -like '*2.000 e r$5*'){3}elseif($a -like '*5.000 e r$10*'){4}elseif($a -like '*mais de r$10*'){5}else{-1} }
+function IdxDispon($v){ $a=Deaccent $v; if($a -like '*ate r$100*'){0}elseif($a -like '*100 a r$500*'){1}elseif($a -like '*500 a r$1.000*'){2}elseif($a -like '*1.000 a r$5*'){3}elseif($a -like '*mais de r$5*'){4}else{-1} }
+function IdxInvest($v){ $a=Deaccent $v; if($a -like '*ainda nao investi*'){0}elseif($a -like '*ate r$10.000*'){1}elseif($a -like '*10.000 a r$50*'){2}elseif($a -like '*50.000 a r$100*'){3}elseif($a -like '*100.000 a r$500*'){4}elseif($a -like '*500.000 a r$1.000.000*'){5}elseif($a -like '*mais de r$1.000.000*'){6}else{-1} }
+function IdxCurso($v){ $a=Deaccent $v; if($a -like '*aluno*'){2}elseif($a -like 'sim*'){1}elseif($a -like 'nao*'){0}else{-1} }
 function Cell($r,$i){ if($i -ge 0 -and $r.Count -gt $i){ return $r[$i] } return '' }
 function Bump($h,$k){ if($null -eq $k -or $k -eq ''){return}; if(-not $h.ContainsKey($k)){$h[$k]=0}; $h[$k]++ }
 function DistArr($h){ $out=@(); foreach($e in ($h.GetEnumerator()|Sort-Object Value -Descending)){ if([string]$e.Key -eq ''){continue}; $out+=[pscustomobject]@{label=[string]$e.Key;n=[int]$e.Value} }; return ,@($out) }
@@ -182,9 +195,9 @@ function NowBR(){
 #  As funcoes GetDay/GetGrain mutam $daily/$grain locais desta funcao
 #  (escopo dinamico do PowerShell: elas leem $daily/$grain do chamador).
 # =====================================================================
-function GetDay($ch,$d){ $k=$ch+'|'+$d; if(-not $daily.ContainsKey($k)){ $daily[$k]=[pscustomobject]@{channel=$ch;date=$d;spend=0.0;impr=0;reach=0;clicks=0;lpv=0;platLeads=0;leads=0;qual=0} }; return $daily[$k] }
+function GetDay($ch,$d){ $k=$ch+'|'+$d; if(-not $daily.ContainsKey($k)){ $daily[$k]=[pscustomobject]@{channel=$ch;date=$d;spend=0.0;impr=0;reach=0;clicks=0;lpv=0;platLeads=0;leads=0;la=0;lb=0;lc=0} }; return $daily[$k] }
 function GetGrain($ch,$d,$c,$s,$a){ $key=($ch+[char]31+$d+[char]31+$c+[char]31+$s+[char]31+$a)
-  if(-not $grain.ContainsKey($key)){ $grain[$key]=[pscustomobject]@{channel=$ch;date=$d;campaign=$c;adset=$s;ad=$a;spend=0.0;impr=0;reach=0;clicks=0;lpv=0;platLeads=0;leads=0;qual=0} }
+  if(-not $grain.ContainsKey($key)){ $grain[$key]=[pscustomobject]@{channel=$ch;date=$d;campaign=$c;adset=$s;ad=$a;spend=0.0;impr=0;reach=0;clicks=0;lpv=0;platLeads=0;leads=0;la=0;lb=0;lc=0} }
   return $grain[$key] }
 
 function Build-Funnel($cfg){
@@ -293,14 +306,14 @@ function Build-Funnel($cfg){
   # ===================================================================
   $leadsByDay=@{}; foreach($lr in $leadRows){ if($lr.date -match '^\d{4}-\d{2}-\d{2}$'){ if(-not $leadsByDay.ContainsKey($lr.date)){$leadsByDay[$lr.date]=0}; $leadsByDay[$lr.date]++ } }
 
-  # ---- PESQUISA (respostas por pessoa; cruza por e-mail; score de qualificacao) ----
-  $survTotal=0; $survDone=0; $survInc=0; $survDoneByDay=@{}; $survAllByDay=@{}; $respMails=@{}; $respScore=@{}
+  # ---- PESQUISA (respostas por pessoa; cruza por e-mail; classe A/B/C do perfil) ----
+  $survTotal=0; $survDone=0; $survInc=0; $survDoneByDay=@{}; $survAllByDay=@{}; $respMails=@{}; $respProfile=@{}
   if($leadsOk){ try {
     $pCsv=Join-Path $dataDir 'pesquisa.csv'; Get-SheetByName $cfg.leadsId 'pesquisa' $pCsv
     $pp=Read-Csv $pCsv; $ph=$pp[0]; $pdRows=$pp[1..($pp.Count-1)]
     $P_MAIL=HdrLike $ph '*mail*'; $P_STATUS=HdrLike $ph 'status'; $P_DATE=HdrLike $ph 'date'
-    $P_IDADE=HdrLike $ph '*idade*'; $P_INVEST=HdrLike $ph '*ja investiu*'; $P_RENDA=HdrLike $ph '*faixa de renda*'
-    $P_DISPON=HdrLike $ph '*disponivel para investir*'; $P_CURSO=HdrLike $ph '*comprou algum curso*'
+    $P_IDADE=HdrLike $ph '*idade*'; $P_MOM=HdrLike $ph '*momento profissional*'; $P_INVEST=HdrLike $ph '*ja investiu*'
+    $P_RENDA=HdrLike $ph '*faixa de renda*'; $P_DISPON=HdrLike $ph '*disponivel para investir*'; $P_CURSO=HdrLike $ph '*comprou algum curso*'
     foreach($r in $pdRows){
       if($null -eq $r -or $r.Count -eq 0){ continue }
       $pm = if($P_MAIL -ge 0 -and $r.Count -gt $P_MAIL){ (Norm $r[$P_MAIL]).ToLower() } else { '' }
@@ -310,28 +323,37 @@ function Build-Funnel($cfg){
       $done = ($pst -eq 'completed' -or $pst -eq 'complete')
       $survTotal++; if($done){ $survDone++ } elseif($pst -eq 'incomplete'){ $survInc++ }
       if($pm -ne ''){ $respMails[$pm]=$true
-        $sc = QScore (Cell $r $P_IDADE) (Cell $r $P_INVEST) (Cell $r $P_RENDA) (Cell $r $P_DISPON) (Cell $r $P_CURSO)
-        if(-not $respScore.ContainsKey($pm) -or $sc -gt $respScore[$pm]){ $respScore[$pm]=$sc }   # melhor resposta por e-mail
+        $vId=Cell $r $P_IDADE; $vMo=Cell $r $P_MOM; $vRe=Cell $r $P_RENDA; $vDi=Cell $r $P_DISPON; $vIn=Cell $r $P_INVEST; $vCu=Cell $r $P_CURSO
+        # mantem a resposta MAIS RECENTE por e-mail (data desc); empate -> primeira
+        if(-not $respProfile.ContainsKey($pm) -or ($pd -ne '' -and $pd -gt $respProfile[$pm].date)){
+          $respProfile[$pm]=@{ date=$pd; cls=(LeadClass $vId $vMo $vRe $vDi); a=(IdxIdade $vId); m=(IdxMomento $vMo); r=(IdxRenda $vRe); p=(IdxDispon $vDi); v=(IdxInvest $vIn); u=(IdxCurso $vCu) }
+        }
       }
       if($pd -ne ''){ Bump $survAllByDay $pd; if($done){ Bump $survDoneByDay $pd } }
     }
   } catch { Write-Host ("AVISO: [$name] aba pesquisa nao lida: "+$_.Exception.Message) } }
   $respLeads=0; foreach($m in $respMails.Keys){ if($leadMails.ContainsKey($m)){ $respLeads++ } }
 
-  # ---- QUALIFICACAO: marca lead qualificado (score>=QUALMIN) e acumula por dia/grain ----
-  $qualTotal=0; $qualHist=@(0)*12; $qLeadsResp=0
+  # ---- CLASSE A/B/C por lead atribuido: acumula por dia/grain (p/ CPL A/B/C e Acao) ----
+  $totA=0;$totB=0;$totC=0; $qLeadsResp=0
   foreach($lr in $leadRows){
-    $em=$lr.qmail; if($em -eq '' -or -not $respScore.ContainsKey($em)){ continue }  # so quem respondeu tem score
-    $qLeadsResp++
-    $sc=[int]$respScore[$em]; if($sc -lt 0){$sc=0}; if($sc -gt 11){$sc=11}; $qualHist[$sc]++
-    if($sc -ge $QUALMIN){
-      $qualTotal++
-      if($lr.plat -ne ''){
-        if($lr.date -match '^\d{4}-\d{2}-\d{2}$'){ $o=GetDay $lr.plat $lr.date; $o.qual++ }
-        $g=GetGrain $lr.plat $lr.date $lr.camp $lr.adset $lr.ad; $g.qual++
-      }
+    $em=$lr.qmail; if($em -eq '' -or -not $respProfile.ContainsKey($em)){ continue }
+    $qLeadsResp++; $cls=$respProfile[$em].cls
+    if($cls -eq 'A'){$totA++}elseif($cls -eq 'C'){$totC++}else{$totB++}
+    if($lr.plat -ne ''){
+      $o = if($lr.date -match '^\d{4}-\d{2}-\d{2}$'){ GetDay $lr.plat $lr.date } else { $null }
+      $g = GetGrain $lr.plat $lr.date $lr.camp $lr.adset $lr.ad
+      if($cls -eq 'A'){ if($o){$o.la++}; $g.la++ } elseif($cls -eq 'C'){ if($o){$o.lc++}; $g.lc++ } else { if($o){$o.lb++}; $g.lb++ }
     }
   }
+  # respRows (todos os respondentes, p/ a aba Perfil do Lead) — JSON manual injetado via placeholder
+  $rsb=New-Object Text.StringBuilder; [void]$rsb.Append('['); $rfirst=$true; $rA=0;$rB=0;$rC=0
+  foreach($e in $respProfile.Values){
+    if($e.cls -eq 'A'){$rA++}elseif($e.cls -eq 'C'){$rC++}else{$rB++}
+    if(-not $rfirst){ [void]$rsb.Append(',') }; $rfirst=$false
+    [void]$rsb.Append('["'+$e.date+'","'+$e.cls+'",'+$e.a+','+$e.m+','+$e.r+','+$e.p+','+$e.v+','+$e.u+']')
+  }
+  [void]$rsb.Append(']'); $respJson=$rsb.ToString()
 
   # ---- GRUPOS (agregado diario: Data/Entrou/Saiu) ----
   $grpIn=0; $grpOut=0; $grpInByDay=@{}; $grpOutByDay=@{}
@@ -390,12 +412,12 @@ function Build-Funnel($cfg){
     spend=(Sum0 $dailyArr 'spend'); impr=(Sum0 $dailyArr 'impr'); reach=(Sum0 $dailyArr 'reach')
     clicks=(Sum0 $dailyArr 'clicks'); lpv=(Sum0 $dailyArr 'lpv'); platLeads=(Sum0 $dailyArr 'platLeads')
     leads=$leadRows.Count; paid=$paidCount; organic=($leadRows.Count-$paidCount); attributed=$attribCount; tests=$nTest
-    qualified=$qualTotal; respondedLeads=$qLeadsResp
+    leadsA=$totA; leadsB=$totB; leadsC=$totC; respondedLeads=$qLeadsResp
     states=(@($dState.Keys|Where-Object{$_ -ne ''}).Count); cities=(@($dCity.Keys|Where-Object{$_ -ne ''}).Count)
   }
   $byChannel=@(
-    [pscustomobject]@{ch='meta';   spend=(Sum0 $metaDaily 'spend'); impr=(Sum0 $metaDaily 'impr'); clicks=(Sum0 $metaDaily 'clicks'); leads=(Sum0 $metaDaily 'leads'); qual=(Sum0 $metaDaily 'qual'); platLeads=(Sum0 $metaDaily 'platLeads')}
-    [pscustomobject]@{ch='google'; spend=(Sum0 $gglDaily 'spend'); impr=(Sum0 $gglDaily 'impr'); clicks=(Sum0 $gglDaily 'clicks'); leads=(Sum0 $gglDaily 'leads'); qual=(Sum0 $gglDaily 'qual'); platLeads=(Sum0 $gglDaily 'platLeads')}
+    [pscustomobject]@{ch='meta';   spend=(Sum0 $metaDaily 'spend'); impr=(Sum0 $metaDaily 'impr'); clicks=(Sum0 $metaDaily 'clicks'); leads=(Sum0 $metaDaily 'leads'); la=(Sum0 $metaDaily 'la'); lb=(Sum0 $metaDaily 'lb'); lc=(Sum0 $metaDaily 'lc'); platLeads=(Sum0 $metaDaily 'platLeads')}
+    [pscustomobject]@{ch='google'; spend=(Sum0 $gglDaily 'spend'); impr=(Sum0 $gglDaily 'impr'); clicks=(Sum0 $gglDaily 'clicks'); leads=(Sum0 $gglDaily 'leads'); la=(Sum0 $gglDaily 'la'); lb=(Sum0 $gglDaily 'lb'); lc=(Sum0 $gglDaily 'lc'); platLeads=(Sum0 $gglDaily 'platLeads')}
   )
   $bySource=@(
     [pscustomobject]@{src='pago';leads=$paidCount}
@@ -417,18 +439,21 @@ function Build-Funnel($cfg){
       groups=[pscustomobject]@{ entered=$grpIn; left=$grpOut; net=($grpIn-$grpOut) }
       byDay=@($engByDay)
     }
-    qual=[pscustomobject]@{
-      min=$QUALMIN; leads=$qualTotal; responded=$qLeadsResp; totalLeads=$leadRows.Count
-      hist=@($qualHist)
-      ref=[pscustomobject]@{ launches='L17 + L18 + L19'; respondents=42086; buyers=507; baseRate=1.20; qualRate=2.82; lift=2.35; captured=46.9 }
+    lead=[pscustomobject]@{
+      responded=$qLeadsResp; totalLeads=$leadRows.Count
+      respTot=[pscustomobject]@{ A=$rA; B=$rB; C=$rC }
+      ref=[pscustomobject]@{ docs='L17-L20 (Prosperus)'; respondents=53363; buyers=652; baseRate=1.22; convA=2.53; convC=0.27 }
     }
+    resp='__RESP__'
     daily=@($dailyArr); grain=@($grainArr)
   }
-  Write-Host ("  grain={0} leadsReais={1} pago={2} org={3} atrib={4} qualif={5}/{6}resp testes={7}  gasto=R$ {8}" -f `
-    $grainArr.Count,$tot.leads,$tot.paid,$tot.organic,$tot.attributed,$qualTotal,$qLeadsResp,$tot.tests,($tot.spend.ToString('N2',$BR)))
-  Write-Host ("  META:  gasto(imp)=R$ {0}  leads={1} qual={2}  |  GOOGLE: gasto=R$ {3}  leads={4} qual={5}  |  leadsOk={6}" -f `
-    ($byChannel[0].spend.ToString('N2',$BR)),$byChannel[0].leads,$byChannel[0].qual,($byChannel[1].spend.ToString('N2',$BR)),$byChannel[1].leads,$byChannel[1].qual,$leadsOk)
-  return $payload
+  $json = $payload | ConvertTo-Json -Depth 12 -Compress
+  $json = $json.Replace('"__RESP__"', $respJson)
+  Write-Host ("  grain={0} leadsReais={1} pago={2} org={3} atrib={4} A/B/C={5}/{6}/{7} de {8}resp testes={9}  gasto=R$ {10}" -f `
+    $grainArr.Count,$tot.leads,$tot.paid,$tot.organic,$tot.attributed,$totA,$totB,$totC,$qLeadsResp,$tot.tests,($tot.spend.ToString('N2',$BR)))
+  Write-Host ("  META:  gasto=R$ {0}  leads={1} A={2}/B={3}/C={4}  |  GOOGLE: gasto=R$ {5}  leads={6} A={7}/B={8}/C={9}  |  leadsOk={10}" -f `
+    ($byChannel[0].spend.ToString('N2',$BR)),$byChannel[0].leads,$byChannel[0].la,$byChannel[0].lb,$byChannel[0].lc,($byChannel[1].spend.ToString('N2',$BR)),$byChannel[1].leads,$byChannel[1].la,$byChannel[1].lb,$byChannel[1].lc,$leadsOk)
+  return $json
 }
 
 # =====================================================================
@@ -437,8 +462,7 @@ function Build-Funnel($cfg){
 $parts = New-Object System.Collections.Generic.List[string]
 $funMeta = New-Object System.Collections.Generic.List[string]
 foreach($f in $FUNNELS){
-  $p = Build-Funnel $f
-  $j = $p | ConvertTo-Json -Depth 12 -Compress
+  $j = Build-Funnel $f
   $parts.Add(('"'+$f.key+'":'+$j))
   $funMeta.Add(('{"key":"'+$f.key+'","label":"'+$f.label+'"}'))
 }
