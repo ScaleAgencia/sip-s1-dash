@@ -46,6 +46,15 @@ b{font-weight:700}
 .coverage b{color:var(--cy2)}
 .cov-warn{color:var(--warn);font-weight:700}
 .cov-warn b{color:inherit}
+.cov-fase{color:#ffd27a}
+/* filtro global de fase (turma) */
+.fasebar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 14px;padding:9px 13px;background:linear-gradient(135deg,rgba(240,182,77,.09),rgba(139,124,240,.06));border:1px solid var(--line);border-radius:11px}
+.fasebar .fase-lab{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted2);margin-right:2px}
+.fasebar .fbtn2{background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:6px 16px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;transition:.15s}
+.fasebar .fbtn2:hover{color:var(--ink);border-color:#2b3f66}
+.fasebar .fbtn2.on{color:#04121a;border-color:transparent;background:linear-gradient(135deg,#f0b64d,#ffd27a);box-shadow:0 4px 14px rgba(240,182,77,.3)}
+.fasebar .fase-hint{font-size:11px;color:var(--muted2);margin-left:auto}
+@media(max-width:640px){.fasebar .fase-hint{display:none}}
 
 /* ---------- funnel switcher (topo, acima do header) ---------- */
 .funnelbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 16px;padding:9px 12px;

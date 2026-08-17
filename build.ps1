@@ -197,10 +197,12 @@ function NowBR(){
 #  As funcoes GetDay/GetGrain mutam $daily/$grain locais desta funcao
 #  (escopo dinamico do PowerShell: elas leem $daily/$grain do chamador).
 # =====================================================================
-function GetDay($ch,$d){ $k=$ch+'|'+$d; if(-not $daily.ContainsKey($k)){ $daily[$k]=[pscustomobject]@{channel=$ch;date=$d;spend=0.0;impr=0;reach=0;clicks=0;lpv=0;platLeads=0;leads=0;la=0;lb=0;lc=0} }; return $daily[$k] }
+function GetDay($ch,$d){ $k=$ch+'|'+$d; if(-not $daily.ContainsKey($k)){ $daily[$k]=[pscustomobject]@{channel=$ch;date=$d;spend=0.0;impr=0;reach=0;clicks=0;lpv=0;platLeads=0;leads=0;la=0;lb=0;lc=0;byFase=@{}} }; return $daily[$k] }
 function GetGrain($ch,$d,$c,$s,$a){ $key=($ch+[char]31+$d+[char]31+$c+[char]31+$s+[char]31+$a)
-  if(-not $grain.ContainsKey($key)){ $grain[$key]=[pscustomobject]@{channel=$ch;date=$d;campaign=$c;adset=$s;ad=$a;spend=0.0;impr=0;reach=0;clicks=0;lpv=0;platLeads=0;leads=0;la=0;lb=0;lc=0} }
+  if(-not $grain.ContainsKey($key)){ $grain[$key]=[pscustomobject]@{channel=$ch;date=$d;campaign=$c;adset=$s;ad=$a;spend=0.0;impr=0;reach=0;clicks=0;lpv=0;platLeads=0;leads=0;la=0;lb=0;lc=0;byFase=@{}} }
   return $grain[$key] }
+# acumula lead por FASE (tag SIP-S1/SIP-S2/...) dentro de um daily/grain
+function FaseAdd($o,$tag,$field){ if($tag -eq ''){$tag='(sem tag)'}; if(-not $o.byFase.ContainsKey($tag)){ $o.byFase[$tag]=@{leads=0;la=0;lb=0;lc=0} }; $o.byFase[$tag][$field]++ }
 
 function Build-Funnel($cfg){
   $name=$cfg.label
@@ -287,8 +289,8 @@ function Build-Funnel($cfg){
     if($null -ne $at){ $plat='meta' } else { $at=Attribute $camp $cont $GS; if($null -ne $at){ $plat='google' } }
     if($plat -ne ''){
       $cName=$at.camp; $sName=$at.adset; $aName=$at.ad
-      if($d -ne 'sem-data'){ $o=GetDay $plat $d; $o.leads++ }
-      $g=GetGrain $plat $d $cName $sName $aName; $g.leads++
+      if($d -ne 'sem-data'){ $o=GetDay $plat $d; $o.leads++; FaseAdd $o $tag 'leads' }
+      $g=GetGrain $plat $d $cName $sName $aName; $g.leads++; FaseAdd $g $tag 'leads'
     } else { $cName=$SENT; $sName=$SENT; $aName=$SENT }
     Bump $dState $stt; Bump $dCity $cty; Bump $dChannel $chan
     # ---- diario: leads por rede (granular) + pago/org por dia ----
@@ -300,8 +302,8 @@ function Build-Funnel($cfg){
       if(-not $paidDay.ContainsKey($d)){ $paidDay[$d]=@{pago=0;org=0} }
       if($paid){ $paidDay[$d].pago++ } else { $paidDay[$d].org++ }
     }
-    $em=$mail.ToLower(); if($em -ne ''){ $leadMails[$em]=$true; if(-not $leadUtm.ContainsKey($em)){ $leadUtm[$em]=@{s=$chan; m=(Deaccent $med); c=$camp} } }
-    $leadRows.Add([pscustomobject]@{date=$d;paid=$paid;channel=$chan;plat=$plat;state=$stt;camp=$cName;adset=$sName;ad=$aName;qmail=$em})
+    $em=$mail.ToLower(); if($em -ne ''){ $leadMails[$em]=$true; if(-not $leadUtm.ContainsKey($em)){ $leadUtm[$em]=@{s=$chan; m=(Deaccent $med); c=$camp; t=$tag} } }
+    $leadRows.Add([pscustomobject]@{date=$d;paid=$paid;channel=$chan;plat=$plat;state=$stt;city=$cty;camp=$cName;adset=$sName;ad=$aName;qmail=$em;tag=$tag})
   } }
 
   # ===================================================================
@@ -347,11 +349,16 @@ function Build-Funnel($cfg){
     if($lr.plat -ne ''){
       $o = if($lr.date -match '^\d{4}-\d{2}-\d{2}$'){ GetDay $lr.plat $lr.date } else { $null }
       $g = GetGrain $lr.plat $lr.date $lr.camp $lr.adset $lr.ad
-      if($cls -eq 'A'){ if($o){$o.la++}; $g.la++ } elseif($cls -eq 'C'){ if($o){$o.lc++}; $g.lc++ } else { if($o){$o.lb++}; $g.lb++ }
+      $fld= if($cls -eq 'A'){'la'}elseif($cls -eq 'C'){'lc'}else{'lb'}
+      if($o){ $o.$fld++; FaseAdd $o $lr.tag $fld }; $g.$fld++; FaseAdd $g $lr.tag $fld
     }
   }
+  # ---- FASES (tags SIP-S1/SIP-S2/... da planilha de leads) ----
+  $faseKeys=@($leadRows | ForEach-Object { if($_.tag -ne ''){$_.tag}else{'(sem tag)'} } | Sort-Object -Unique)
+  $faseIdxMap=@{}; for($fi2=0;$fi2 -lt $faseKeys.Count;$fi2++){ $faseIdxMap[$faseKeys[$fi2]]=$fi2 }
+
   # respRows (todos os respondentes, p/ a aba Perfil do Lead) — JSON manual injetado via placeholder
-  # linha = [date, cls, idade, mom, renda, dispon, invest, curso, fonteIdx, meioIdx, campanhaIdx]
+  # linha = [date, cls, idade, mom, renda, dispon, invest, curso, fonteIdx, meioIdx, campanhaIdx, faseIdx]
   $rsb=New-Object Text.StringBuilder; [void]$rsb.Append('['); $rfirst=$true; $rA=0;$rB=0;$rC=0
   $srcL=New-Object System.Collections.Generic.List[string]; $srcMap=@{}
   $medL=New-Object System.Collections.Generic.List[string]; $medMap=@{}
@@ -359,13 +366,15 @@ function Build-Funnel($cfg){
   foreach($em in $respProfile.Keys){
     $e=$respProfile[$em]
     if($e.cls -eq 'A'){$rA++}elseif($e.cls -eq 'C'){$rC++}else{$rB++}
-    $u = if($leadUtm.ContainsKey($em)){ $leadUtm[$em] } else { @{s='(sem lead)';m='';c=''} }
+    $u = if($leadUtm.ContainsKey($em)){ $leadUtm[$em] } else { @{s='(sem lead)';m='';c='';t='(sem tag)'} }
     $si=InternL $u.s $srcL $srcMap
     $mi=InternL $(if($u.m -eq ''){'(sem meio)'}else{$u.m}) $medL $medMap
     $cp= if($u.c -eq ''){'(sem campanha)'}elseif($u.c -match '\|'){ (($u.c -split '\|')[-1]).Trim() }else{ $u.c }
     $ci=InternL $cp $campL $campMap
+    $ftag= if($u.t -and $u.t -ne ''){$u.t}else{'(sem tag)'}
+    $f2= if($faseIdxMap.ContainsKey($ftag)){ $faseIdxMap[$ftag] } else { -1 }
     if(-not $rfirst){ [void]$rsb.Append(',') }; $rfirst=$false
-    [void]$rsb.Append('["'+$e.date+'","'+$e.cls+'",'+$e.a+','+$e.m+','+$e.r+','+$e.p+','+$e.v+','+$e.u+','+$si+','+$mi+','+$ci+']')
+    [void]$rsb.Append('["'+$e.date+'","'+$e.cls+'",'+$e.a+','+$e.m+','+$e.r+','+$e.p+','+$e.v+','+$e.u+','+$si+','+$mi+','+$ci+','+$f2+']')
   }
   [void]$rsb.Append(']'); $respJson=$rsb.ToString()
 
@@ -403,9 +412,19 @@ function Build-Funnel($cfg){
     }
   }
 
-  # ---- arrays finais -------------------------------------------------
-  $dailyArr=@($daily.Values | Sort-Object date)
-  $grainArr=@($grain.Values | Where-Object { $_.spend -gt 0 -or $_.leads -gt 0 } | Sort-Object date)
+  # ---- arrays finais (por FASE: gasto rateado pela participacao de leads de cada fase no dia) ----
+  $dailyL=New-Object System.Collections.Generic.List[object]
+  foreach($rec in $daily.Values){ $tl=$rec.leads
+    if($tl -gt 0){ foreach($f in $rec.byFase.Keys){ $bf=$rec.byFase[$f]; $sh=$bf.leads/$tl
+      $dailyL.Add([pscustomobject]@{channel=$rec.channel;date=$rec.date;fase=$f;spend=($rec.spend*$sh);impr=[int][math]::Round($rec.impr*$sh);reach=[int][math]::Round($rec.reach*$sh);clicks=[int][math]::Round($rec.clicks*$sh);lpv=[int][math]::Round($rec.lpv*$sh);platLeads=[int][math]::Round($rec.platLeads*$sh);leads=$bf.leads;la=$bf.la;lb=$bf.lb;lc=$bf.lc}) } }
+    elseif($rec.spend -gt 0 -or $rec.impr -gt 0){ $dailyL.Add([pscustomobject]@{channel=$rec.channel;date=$rec.date;fase='(sem fase)';spend=$rec.spend;impr=$rec.impr;reach=$rec.reach;clicks=$rec.clicks;lpv=$rec.lpv;platLeads=$rec.platLeads;leads=0;la=0;lb=0;lc=0}) } }
+  $dailyArr=@($dailyL | Sort-Object date)
+  $grainL=New-Object System.Collections.Generic.List[object]
+  foreach($rec in $grain.Values){ if(-not ($rec.spend -gt 0 -or $rec.leads -gt 0)){ continue }; $tl=$rec.leads
+    if($tl -gt 0){ foreach($f in $rec.byFase.Keys){ $bf=$rec.byFase[$f]; $sh=$bf.leads/$tl
+      $grainL.Add([pscustomobject]@{channel=$rec.channel;date=$rec.date;campaign=$rec.campaign;adset=$rec.adset;ad=$rec.ad;fase=$f;spend=($rec.spend*$sh);impr=[int][math]::Round($rec.impr*$sh);reach=[int][math]::Round($rec.reach*$sh);clicks=[int][math]::Round($rec.clicks*$sh);lpv=[int][math]::Round($rec.lpv*$sh);platLeads=[int][math]::Round($rec.platLeads*$sh);leads=$bf.leads;la=$bf.la;lb=$bf.lb;lc=$bf.lc}) } }
+    else { $grainL.Add([pscustomobject]@{channel=$rec.channel;date=$rec.date;campaign=$rec.campaign;adset=$rec.adset;ad=$rec.ad;fase='(sem fase)';spend=$rec.spend;impr=$rec.impr;reach=$rec.reach;clicks=$rec.clicks;lpv=$rec.lpv;platLeads=$rec.platLeads;leads=0;la=0;lb=0;lc=0}) } }
+  $grainArr=@($grainL | Sort-Object date)
   $dates=@($dailyArr | Where-Object { $_.date -match '^\d{4}-\d{2}-\d{2}$' } | ForEach-Object { $_.date } | Sort-Object -Unique)
   $leadDates=@($leadRows | Where-Object { $_.date -match '^\d{4}-\d{2}-\d{2}$' } | ForEach-Object { $_.date } | Sort-Object)
 
@@ -437,6 +456,18 @@ function Build-Funnel($cfg){
     [pscustomobject]@{src='pago';leads=$paidCount}
     [pscustomobject]@{src='organico';leads=($leadRows.Count-$paidCount)}
   )
+  # ---- agregados de leads POR FASE (aba Leads · Visao Geral filtra por fase) — 1 passada ----
+  $faB=@{}; foreach($fk in $faseKeys){ $faB[$fk]=@{ch=@{};st=@{};ct=@{};leads=0;paid=0;attr=0} }
+  foreach($lr in $leadRows){ $fk= if($lr.tag -ne ''){$lr.tag}else{'(sem tag)'}; if(-not $faB.ContainsKey($fk)){ continue }; $b=$faB[$fk]
+    $b.leads++; Bump $b.ch $lr.channel; Bump $b.st $lr.state; Bump $b.ct $lr.city; if($lr.paid){$b.paid++}; if($lr.plat -ne ''){$b.attr++} }
+  $faseAgg=@{}
+  foreach($fk in $faseKeys){ $b=$faB[$fk]
+    $faseAgg[$fk]=[pscustomobject]@{
+      leads=$b.leads; paid=$b.paid; organic=($b.leads-$b.paid); attributed=$b.attr
+      states=(@($b.st.Keys|Where-Object{$_ -ne ''}).Count)
+      channels=(DistArr $b.ch); geo=(DistArr $b.st); cities=(DistArr $b.ct)
+    }
+  }
 
   $payload=[pscustomobject]@{
     key=$cfg.key; label=$cfg.label; funnel=$cfg.label; leadsOk=$leadsOk
@@ -446,6 +477,7 @@ function Build-Funnel($cfg){
     leadDateMin=$(if($leadDates.Count){$leadDates[0]}else{''}); leadDateMax=$(if($leadDates.Count){$leadDates[-1]}else{''})
     totals=$tot; byChannel=@($byChannel); bySource=@($bySource)
     channels=(DistArr $dChannel); geo=(DistArr $dState); cities=(DistArr $dCity)
+    fases=@($faseKeys); faseAgg=[pscustomobject]$faseAgg
     srcOrder=@($srcOrder); srcDaily=@($srcDaily); paidDaily=@($paidDaily)
     engage=[pscustomobject]@{
       leads=$leadRows.Count

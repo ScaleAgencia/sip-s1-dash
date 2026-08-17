@@ -72,10 +72,20 @@ function prevRange(rng){ var len=daysBetween(rng[0],rng[1])+1; var pe=addDays(rn
 
 var channel='geral';   // geral | meta | google
 function chMatch(d){ return channel==='geral' || d.channel===channel; }
+var fase='all';        // filtro global de FASE (turma): 'all' ou a tag (SIP-S1/SIP-S2/...)
+function faseMatch(d){ return fase==='all' || d.fase===fase; }
+function faseLabel(k){ return String(k).replace(/^SIP-/i,''); }
+function faseSpend(){ var s=0; daily.forEach(function(d){ if(faseMatch(d)) s+=d.spend||0; }); return s; }
+/* agregado de leads da fase selecionada (aba Leads/coverage) */
+function leadAgg(){
+  if(fase==='all') return {leads:totals.leads||0,paid:totals.paid||0,organic:totals.organic||0,attributed:totals.attributed||0,states:totals.states||0,channels:arr(D.channels),geo:arr(D.geo),cities:arr(D.cities)};
+  var fa=(D.faseAgg&&D.faseAgg[fase])||{};
+  return {leads:fa.leads||0,paid:fa.paid||0,organic:fa.organic||0,attributed:fa.attributed||0,states:fa.states||0,channels:arr(fa.channels),geo:arr(fa.geo),cities:arr(fa.cities)};
+}
 var CHMETS=['spend','impr','reach','clicks','lpv','platLeads','leads','la','lb','lc','mLeads','gLeads'];
 function daysInRange(rng){
   var map={};
-  daily.forEach(function(d){ if(!isDate(d.date)||!inRange(d.date,rng)||!chMatch(d)) return;
+  daily.forEach(function(d){ if(!isDate(d.date)||!inRange(d.date,rng)||!chMatch(d)||!faseMatch(d)) return;
     var o=map[d.date]; if(!o){ o={date:d.date}; CHMETS.forEach(function(k){o[k]=0;}); map[d.date]=o; }
     o.spend+=d.spend||0;o.impr+=d.impr||0;o.reach+=d.reach||0;o.clicks+=d.clicks||0;o.lpv+=d.lpv||0;o.platLeads+=d.platLeads||0;o.leads+=d.leads||0;
     o.la+=d.la||0;o.lb+=d.lb||0;o.lc+=d.lc||0;
@@ -299,7 +309,7 @@ function cmpNodes(a,b){
 }
 function sortKids(obj){ return Object.keys(obj).sort(function(x,y){ return cmpNodes(obj[x],obj[y]); }); }
 function renderTree(rng){
-  var rows=grain.filter(function(r){return inRange(r.date,rng)&&chMatch(r);});
+  var rows=grain.filter(function(r){return inRange(r.date,rng)&&chMatch(r)&&faseMatch(r);});
   var camps=buildTree(rows), order=sortKids(camps);
   var lA=[],lB=[],lC=[]; order.forEach(function(cK){ if(cK==='SEM_RASTREIO')return; var c=camps[cK]; Object.keys(c.kids).forEach(function(sK){ var sN=c.kids[sK]; Object.keys(sN.kids).forEach(function(aK){ var an=sN.kids[aK]; if(an.spend>0&&an.la>0) lA.push(dv(an.spend,an.la)); if(an.spend>0&&an.lb>0) lB.push(dv(an.spend,an.lb)); if(an.spend>0&&an.lc>0) lC.push(dv(an.spend,an.lc)); }); }); });
   var medA=median(lA), medB=median(lB), medC=median(lC);
@@ -395,22 +405,22 @@ function mountSourceDaily(){
   else renderStacked('chartPaidDaily', prows, ['Tráfego pago','Orgânico'], function(k){ return k==='Tráfego pago'?COL.cy:COL.vi; });
 }
 function mountLeads(){
-  var t=totals, total=t.leads||0, paid=t.paid||0, org=t.organic||0, spend=t.spend||0;
-  var paidFrac=dv(paid,total);
-  var geo=arr(D.geo), topState=geo[0];
+  var LA=leadAgg(), total=LA.leads||0, paid=LA.paid||0, org=LA.organic||0, spend=faseSpend();
+  var paidFrac=dv(paid,total), citiesN=arr(LA.cities).length;
+  var geo=LA.geo, topState=geo[0];
   // veredito
   var big = paid>=org ? 'A maioria vem do TRÁFEGO PAGO' : 'A maioria é ORGÂNICA';
   el('verdict').innerHTML=donut(paidFrac,COL.cy,total?pct(paidFrac*100):'—','pago',150)
     +'<div class="v-txt"><div class="v-big">'+intf(total)+' leads captados</div>'
     +'<div class="v-sub">'+big+' · <b class="chip-pago">'+intf(paid)+' pago</b> · <b class="chip-org">'+intf(org)+' orgânico</b>'
     +(topState?' · estado líder <b style="color:var(--ink2)">'+esc(topState.label)+'</b> ('+intf(topState.n)+')':'')+'</div>'
-    +'<div class="v-sub">'+intf(t.attributed||0)+' leads atribuídos a um anúncio · alcance em <b style="color:var(--ink2)">'+intf(t.states||0)+' estados</b> e '+intf(t.cities||0)+' cidades</div></div>';
+    +'<div class="v-sub">'+intf(LA.attributed||0)+' leads atribuídos a um anúncio · alcance em <b style="color:var(--ink2)">'+intf(LA.states||0)+' estados</b> e '+intf(citiesN)+' cidades</div></div>';
   // stats
   el('leadsStats').innerHTML='<div class="stat-row">'
     +'<div class="stat"><div class="s-v">'+intf(total)+'</div><div class="s-l">Leads captados</div></div>'
     +'<div class="stat pago"><div class="s-v">'+intf(paid)+'</div><div class="s-l">Tráfego pago</div></div>'
     +'<div class="stat org"><div class="s-v">'+intf(org)+'</div><div class="s-l">Orgânico</div></div>'
-    +'<div class="stat geo"><div class="s-v">'+intf(t.states||0)+'</div><div class="s-l">Estados alcançados</div></div></div>';
+    +'<div class="stat geo"><div class="s-v">'+intf(LA.states||0)+'</div><div class="s-l">Estados alcançados</div></div></div>';
   // pago x organico thermo + tabela
   el('thermoSrc').innerHTML='<div class="thermo">'
     +(paid>0?'<span style="width:'+(dv(paid,total)*100).toFixed(1)+'%;background:'+COL.cy+'" title="Pago: '+paid+'">'+(dv(paid,total)>0.08?intf(paid):'')+'</span>':'')
@@ -422,7 +432,7 @@ function mountLeads(){
     +'<tr style="font-weight:800"><td>Total</td><td class="num">'+intf(total)+'</td><td class="num">100%</td><td class="num">'+(total?money0(dv(spend,total)):'—')+'</td></tr>';
   el('sourceTbl').innerHTML=head+'<tbody>'+body+'</tbody>';
   // fontes de leads (rico, por utm_source · utm vazia = TikTok)
-  renderSources(arr(D.channels), total);
+  renderSources(LA.channels, total);
   // diario empilhado por rede + pago x organico
   mountSourceDaily();
   // geo
@@ -431,7 +441,7 @@ function mountLeads(){
   renderAdRank();
 }
 function renderAdRank(){
-  var rows=grain.filter(function(r){return r.ad!=='SEM_RASTREIO';}), ads={};
+  var rows=grain.filter(function(r){return r.ad!=='SEM_RASTREIO'&&faseMatch(r);}), ads={};
   rows.forEach(function(r){ var k=r.ad+'##'+r.campaign; var n=ads[k]||(ads[k]={ad:prettyName(r.ad),camp:r.campaign,spend:0,leads:0,clicks:0,lpv:0}); n.spend+=r.spend||0;n.leads+=r.leads||0;n.clicks+=r.clicks||0;n.lpv+=r.lpv||0; });
   var list=Object.keys(ads).map(function(k){return ads[k];}).filter(function(n){return n.leads>0||n.spend>0;}).sort(function(x,y){return y.leads-x.leads||y.spend-x.spend;});
   var head='<thead><tr><th>Anúncio</th><th>Gasto</th><th>Leads</th><th>CPL</th><th>Connect</th></tr></thead>';
@@ -518,9 +528,10 @@ function abcCard(cls,title,sub,n,tot,color){
     +'<div class="abc-p">'+pct(dv(n,tot)*100)+'</div></div>'; }
 function mountProfile(){
   if(!el('profStats')) return;
-  var rng=profRangeFor(profPeriod);
+  var rng=profRangeFor(profPeriod), fIdx=(fase==='all')?-1:arr(D.fases).indexOf(fase);
   var rows=arr(D.resp).filter(function(r){ return isDate(r[0]) && inRange(r[0],rng)
-    && (profSrc<0 || r[8]==profSrc) && (profMed<0 || r[9]==profMed) && (profCamp<0 || r[10]==profCamp); });
+    && (profSrc<0 || r[8]==profSrc) && (profMed<0 || r[9]==profMed) && (profCamp<0 || r[10]==profCamp)
+    && (fIdx<0 || r[11]==fIdx); });
   el('profPeriods').innerHTML=PRESETS.map(function(pp){return '<button data-k="'+pp.k+'" class="pbtn'+(profPeriod===pp.k?' on':'')+'">'+pp.label+'</button>';}).join('');
   Array.prototype.forEach.call(el('profPeriods').querySelectorAll('.pbtn'),function(b){ b.addEventListener('click',function(){ profPeriod=b.getAttribute('data-k'); mountProfile(); }); });
   // filtros por UTM (fonte / meio / campanha do lead)
@@ -689,6 +700,19 @@ function initChannels(){
     b.addEventListener('click',function(){ channel=b.getAttribute('data-ch'); treeInited=false; syncChannelUI(); renderAll(); }); });
   syncChannelUI();
 }
+/* ---- filtro global de FASE (turma: SIP-S1 / SIP-S2 / ...) ---- */
+function syncFaseUI(){ if(!el('fasebar'))return; Array.prototype.forEach.call(el('fasebar').querySelectorAll('.fbtn2'),function(b){ b.classList.toggle('on', fase===b.getAttribute('data-f')); }); }
+function applyFase(){ treeInited=false; syncFaseUI(); initCoverage(); renderAll(); mountLeads(); mountProfile(); }
+function initFases(){ var box=el('fasebar'); if(!box) return; var fs=arr(D.fases);
+  if(fs.length<2){ box.innerHTML=''; box.style.display='none'; fase='all'; return; }
+  box.style.display='';
+  box.innerHTML='<span class="fase-lab">Fase</span><button class="fbtn2" data-f="all">Todas</button>'
+    +fs.map(function(k){ return '<button class="fbtn2" data-f="'+esc(k)+'">'+esc(faseLabel(k))+'</button>'; }).join('')
+    +'<span class="fase-hint">turma de captação · tag do lead na planilha</span>';
+  Array.prototype.forEach.call(box.querySelectorAll('.fbtn2'),function(b){
+    b.addEventListener('click',function(){ fase=b.getAttribute('data-f'); applyFase(); }); });
+  syncFaseUI();
+}
 function renderAll(){ var rng=rangeFor(period), a=aggDaily(rng), p=aggDaily(prevRange(rng)), days=daysInRange(rng);
   renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderDaily(rng); renderTree(rng); }
 var TABS=['funil','leads','perfil','engaje'];
@@ -707,8 +731,10 @@ function initCoverage(){ el('updated').textContent=D.generatedAtBR||FUN.generate
   } else if((D.leadDateMin||'')!==(minDate||'') || (D.leadDateMax||'')!==(maxDate||'')){
     msg='Funil <b>'+esc(lab)+'</b> · Leads registrados: <b>'+fmtBR(D.leadDateMin||'')+' → '+fmtBR(D.leadDateMax||'')+'</b> · Tráfego/gasto: <b>'+fmtBR(minDate)+' → '+fmtBR(maxDate)+'</b>. Em dias sem lead o CPL fica "—".';
   } else {
-    msg='Funil <b>'+esc(lab)+'</b> · <b>'+fmtBR(minDate)+' → '+fmtBR(maxDate)+'</b> · <b>'+intf(totals.leads||0)+'</b> leads ('+intf(totals.paid||0)+' pago · '+intf(totals.organic||0)+' org)'+chTxt+'.';
+    var LA=leadAgg();
+    msg='Funil <b>'+esc(lab)+'</b> · <b>'+fmtBR(minDate)+' → '+fmtBR(maxDate)+'</b> · <b>'+intf(LA.leads||0)+'</b> leads ('+intf(LA.paid||0)+' pago · '+intf(LA.organic||0)+' org)'+chTxt+'.';
   }
+  if(fase!=='all') msg+=' <b class="cov-fase">▸ Fase '+esc(faseLabel(fase))+'</b>';
   el('coverage').innerHTML=msg; }
 
 /* =================== FUNNEL SWITCH (topo) =================== */
@@ -724,8 +750,8 @@ function switchFunnel(key){
   funKey=key; setFunnelVars();
   period='tudo'; customRange=null; channel='geral'; treeInited=false; expanded={};
   updateBranding(); syncFunnelUI(); syncChannelUI();
-  profPeriod='tudo'; profSrc=-1; profMed=-1; profCamp=-1;
-  initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal();
+  profPeriod='tudo'; profSrc=-1; profMed=-1; profCamp=-1; fase='all';
+  initFases(); initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal();
   if(history.replaceState){ history.replaceState(null,'', location.pathname+'?funnel='+key+(location.hash||'')); }
 }
 function initFunnels(){
@@ -740,5 +766,5 @@ function initFunnels(){
 }
 
 if(!funnels.length || (!daily.length && !grain.length)){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
-else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); }
+else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); }
 })();
