@@ -108,6 +108,12 @@ function Channel($src){ $s=Deaccent $src
   if($s -eq 'manychat'){ return 'ManyChat' }
   if($s -eq 'whatsapp' -or $s -eq 'wpp'){ return 'WhatsApp' }
   return (TitleFirst $src) }
+# --- utm_campaign p/ o filtro da aba Perfil ---
+# Em query string o caractere '+' vale ESPACO, entao "PUBLICO 40+" e "PUBLICO 40 " sao a
+# MESMA campanha (o '+' foi decodificado como espaco em alguns links). CampKey normaliza p/
+# mesclar; CampSrcLabel traduz a rede p/ Meta/Google (o resto mantem o nome da rede).
+function CampKey($c){ if($null -eq $c){return ''}; return (((([string]$c) -replace '\+',' ') -replace '\s+',' ').Trim().ToLower()) }
+function CampSrcLabel($rede){ if($rede -eq 'Facebook Ads'){return 'Meta'}; if($rede -eq 'Google Ads'){return 'Google'}; return [string]$rede }
 # fonte GRANULAR p/ o diario por rede: separa placement do organico via utm_term (bio/direct/...).
 function SourceGran($src,$med,$term){ $s=Deaccent $src; $t=Deaccent $term
   if($s -eq ''){ return 'TikTok' }
@@ -357,6 +363,20 @@ function Build-Funnel($cfg){
   $faseKeys=@($leadRows | ForEach-Object { if($_.tag -ne ''){$_.tag}else{'(sem tag)'} } | Sort-Object -Unique)
   $faseIdxMap=@{}; for($fi2=0;$fi2 -lt $faseKeys.Count;$fi2++){ $faseIdxMap[$faseKeys[$fi2]]=$fi2 }
 
+  # ---- canonicaliza utm_campaign p/ o filtro da aba Perfil ----
+  # mescla variantes '+/espaco' (mesma campanha) por chave normalizada e escolhe p/ exibir
+  # o NOME COMPLETO mais "rico" (preferindo o que tem '+', dps o mais longo) + a FONTE.
+  $campCanon=@{}   # key -> @{disp; src; score}
+  foreach($u in $leadUtm.Values){
+    $c=[string]$u.c; if($c -eq '' -or $c -match '\{\{'){ continue }
+    $full=(($c -replace '\s+',' ').Trim())
+    $k=CampKey $c
+    $score=$full.Length + (([regex]::Matches($full,'\+')).Count * 1000)
+    if(-not $campCanon.ContainsKey($k) -or $score -gt $campCanon[$k].score){
+      $campCanon[$k]=@{ disp=$full; src=(CampSrcLabel $u.s); score=$score }
+    }
+  }
+
   # respRows (todos os respondentes, p/ a aba Perfil do Lead) — JSON manual injetado via placeholder
   # linha = [date, cls, idade, mom, renda, dispon, invest, curso, fonteIdx, meioIdx, campanhaIdx, faseIdx]
   $rsb=New-Object Text.StringBuilder; [void]$rsb.Append('['); $rfirst=$true; $rA=0;$rB=0;$rC=0
@@ -369,7 +389,8 @@ function Build-Funnel($cfg){
     $u = if($leadUtm.ContainsKey($em)){ $leadUtm[$em] } else { @{s='(sem lead)';m='';c='';t='(sem tag)'} }
     $si=InternL $u.s $srcL $srcMap
     $mi=InternL $(if($u.m -eq ''){'(sem meio)'}else{$u.m}) $medL $medMap
-    $cp= if($u.c -eq ''){'(sem campanha)'}elseif($u.c -match '\|'){ (($u.c -split '\|')[-1]).Trim() }else{ $u.c }
+    $cp= if($u.c -eq '' -or $u.c -match '\{\{'){ '(sem campanha)' }
+         else { $k=CampKey $u.c; if($campCanon.ContainsKey($k)){ $campCanon[$k].src+' '+[char]0xB7+' '+$campCanon[$k].disp } else { (($u.c -replace '\s+',' ').Trim()) } }
     $ci=InternL $cp $campL $campMap
     $ftag= if($u.t -and $u.t -ne ''){$u.t}else{'(sem tag)'}
     $f2= if($faseIdxMap.ContainsKey($ftag)){ $faseIdxMap[$ftag] } else { -1 }
