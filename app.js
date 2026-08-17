@@ -363,15 +363,15 @@ function renderSources(list,total){
 var REDECOLOR={ 'Facebook Ads':'#22d3ee','Google Ads':'#8b7cf0','TikTok':'#00d1c9','Insta bio':'#e46aa7','Insta direct':'#f59ecb','Instagram':'#e46aa7','YouTube':'#ff5a5a','ManyChat':'#5b8def','WhatsApp':'#25d366' };
 function makeRedeColorer(keys){ var pal=['#f5b041','#a99bf7','#67e8f9','#f2637e','#5eead4','#fca5a5','#c4b5fd'],u=0,map={};
   keys.forEach(function(k){ if(REDECOLOR[k])map[k]=REDECOLOR[k]; else {map[k]=pal[u%pal.length];u++;} }); return function(k){ return map[k]||'#8093b3'; }; }
-function renderStacked(elId, rows, keys, colorOf, labelOf){
+function renderStacked(elId, rows, keys, colorOf, labelOf, percent){
   labelOf=labelOf||function(k){return k;};
-  var W=760,H=248,pl=32,pr=10,pt=14,pb=24,pw=W-pl-pr,ph=H-pt-pb,base=pt+ph;
+  var W=760,H=248,pl=34,pr=10,pt=14,pb=24,pw=W-pl-pr,ph=H-pt-pb,base=pt+ph;
   var tot=rows.map(function(r){ var s=0; keys.forEach(function(k){s+=(r.seg[k]||0);}); return s; });
   var maxT=Math.max.apply(null,tot.concat([1])), n=rows.length||1, gw=pw/n, bw=Math.max(4,Math.min(34,gw*0.62));
   var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
-  [0,0.5,1].forEach(function(f){ var y=pt+ph*(1-f); s+='<line x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'" stroke="#182034" stroke-dasharray="2 3"/>'; s+='<text x="'+(pl-4)+'" y="'+(y+3)+'" text-anchor="end" fill="#586a8c" font-size="9">'+Math.round(maxT*f)+'</text>'; });
-  rows.forEach(function(r,i){ var xc=pl+gw*i+gw/2, yTop=base;
-    keys.forEach(function(k){ var v=r.seg[k]||0; if(v<=0) return; var h=ph*v/maxT;
+  [0,0.5,1].forEach(function(f){ var y=pt+ph*(1-f); s+='<line x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'" stroke="#182034" stroke-dasharray="2 3"/>'; s+='<text x="'+(pl-4)+'" y="'+(y+3)+'" text-anchor="end" fill="#586a8c" font-size="9">'+(percent?Math.round(f*100)+'%':Math.round(maxT*f))+'</text>'; });
+  rows.forEach(function(r,i){ var xc=pl+gw*i+gw/2, yTop=base, denom=percent?tot[i]:maxT; if(percent && !denom) return;
+    keys.forEach(function(k){ var v=r.seg[k]||0; if(v<=0) return; var h=ph*v/denom;
       s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(yTop-h).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" fill="'+colorOf(k)+'"/>'; yTop-=h; }); });
   xticks(rows).forEach(function(i){ var xc=pl+gw*i+gw/2; s+='<text x="'+xc.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" fill="#586a8c" font-size="9">'+fmtBR(rows[i].date)+'</text>'; });
   s+=hitRects(rows,pl,gw,pt,ph)+'</svg>';
@@ -379,7 +379,7 @@ function renderStacked(elId, rows, keys, colorOf, labelOf){
   el(elId).innerHTML='<div class="chart">'+s+'</div><div class="chart-legend wrap">'+legend+'</div>';
   bindHits(elId, rows, function(r){ var t=0; keys.forEach(function(k){t+=(r.seg[k]||0);});
     var h='<div class="tt-d">'+fmtBR(r.date)+' · '+intf(t)+' leads</div>';
-    keys.forEach(function(k){ var v=r.seg[k]||0; if(v>0) h+='<div class="tt-r"><span style="color:'+colorOf(k)+'">'+esc(labelOf(k))+'</span><b>'+intf(v)+'</b></div>'; });
+    keys.forEach(function(k){ var v=r.seg[k]||0; if(v>0) h+='<div class="tt-r"><span style="color:'+colorOf(k)+'">'+esc(labelOf(k))+'</span><b>'+(percent?pct(dv(v,t)*100):intf(v))+'</b></div>'; });
     return h; });
 }
 function mountSourceDaily(){
@@ -527,7 +527,7 @@ function mountProfile(){
   // gráfico diário empilhado A/B/C
   var byDay={}; rows.forEach(function(r){ var d=r[0]; if(!byDay[d])byDay[d]={date:d,seg:{A:0,B:0,C:0}}; byDay[d].seg[abcOf(r[1])]++; });
   var drows=Object.keys(byDay).sort().map(function(k){return byDay[k];});
-  if(drows.length) renderStacked('profChart', drows, ['A','B','C'], function(k){return ABC[k];}, function(k){return 'Lead '+k;});
+  if(drows.length) renderStacked('profChart', drows, ['A','B','C'], function(k){return ABC[k];}, function(k){return 'Lead '+k;}, true);
   else el('profChart').innerHTML='<div class="empty">Sem respostas no período.</div>';
   // distribuição das respostas (o que os leads respondem), colorida por A/B/C
   var html='';
