@@ -504,7 +504,9 @@ function mountEngage(){
 }
 
 /* =================== PERFIL DO LEAD (A/B/C, filtrável por período) =================== */
-var profPeriod='tudo';
+var profPeriod='tudo', profSrc=-1, profMed=-1, profCamp=-1;   // filtros UTM (-1 = todas)
+function profSel(id,label,list,cur){ var o='<option value="-1">todas</option>'; arr(list).forEach(function(v,i){ o+='<option value="'+i+'"'+(cur==i?' selected':'')+'>'+esc(v)+'</option>'; });
+  return '<span class="prof-sel-w"><span class="ps-l">'+label+'</span><select class="prof-sel" id="'+id+'">'+o+'</select></span>'; }
 function profBounds(){ var ds=arr(D.resp).map(function(r){return r[0];}).filter(isDate).sort(); return [ds[0]||minDate, ds[ds.length-1]||maxDate]; }
 function profRangeFor(k){ var b=profBounds(), mn=b[0], mx=b[1];
   if(k==='hoje') return [mx,mx]; if(k==='ontem'){var y=addDays(mx,-1);return [y,y];}
@@ -516,9 +518,20 @@ function abcCard(cls,title,sub,n,tot,color){
     +'<div class="abc-p">'+pct(dv(n,tot)*100)+'</div></div>'; }
 function mountProfile(){
   if(!el('profStats')) return;
-  var rng=profRangeFor(profPeriod), rows=arr(D.resp).filter(function(r){ return isDate(r[0]) && inRange(r[0],rng); });
+  var rng=profRangeFor(profPeriod);
+  var rows=arr(D.resp).filter(function(r){ return isDate(r[0]) && inRange(r[0],rng)
+    && (profSrc<0 || r[8]==profSrc) && (profMed<0 || r[9]==profMed) && (profCamp<0 || r[10]==profCamp); });
   el('profPeriods').innerHTML=PRESETS.map(function(pp){return '<button data-k="'+pp.k+'" class="pbtn'+(profPeriod===pp.k?' on':'')+'">'+pp.label+'</button>';}).join('');
   Array.prototype.forEach.call(el('profPeriods').querySelectorAll('.pbtn'),function(b){ b.addEventListener('click',function(){ profPeriod=b.getAttribute('data-k'); mountProfile(); }); });
+  // filtros por UTM (fonte / meio / campanha do lead)
+  if(el('profFilters')){ var leg=D.respLeg||{};
+    var clr=(profSrc>=0||profMed>=0||profCamp>=0)?'<button class="prof-clr" id="pfClr">limpar ✕</button>':'';
+    el('profFilters').innerHTML='<span class="pf-h">Filtrar por UTM:</span>'+profSel('pfSrc','Fonte',leg.src,profSrc)+profSel('pfMed','Meio',leg.med,profMed)+profSel('pfCamp','Campanha',leg.camp,profCamp)+clr;
+    el('pfSrc').onchange=function(){ profSrc=+this.value; mountProfile(); };
+    el('pfMed').onchange=function(){ profMed=+this.value; mountProfile(); };
+    el('pfCamp').onchange=function(){ profCamp=+this.value; mountProfile(); };
+    if(el('pfClr')) el('pfClr').onclick=function(){ profSrc=-1; profMed=-1; profCamp=-1; mountProfile(); };
+  }
   var cA=0,cB=0,cC=0; rows.forEach(function(r){ var c=abcOf(r[1]); if(c==='A')cA++;else if(c==='C')cC++;else cB++; });
   var tot=cA+cB+cC||1;
   el('profStats').innerHTML='<div class="abc-cards">'
@@ -711,7 +724,7 @@ function switchFunnel(key){
   funKey=key; setFunnelVars();
   period='tudo'; customRange=null; channel='geral'; treeInited=false; expanded={};
   updateBranding(); syncFunnelUI(); syncChannelUI();
-  profPeriod='tudo';
+  profPeriod='tudo'; profSrc=-1; profMed=-1; profCamp=-1;
   initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal();
   if(history.replaceState){ history.replaceState(null,'', location.pathname+'?funnel='+key+(location.hash||'')); }
 }

@@ -156,6 +156,8 @@ function IdxInvest($v){ $a=Deaccent $v; if($a -like '*ainda nao investi*'){0}els
 function IdxCurso($v){ $a=Deaccent $v; if($a -like '*aluno*'){2}elseif($a -like 'sim*'){1}elseif($a -like 'nao*'){0}else{-1} }
 function Cell($r,$i){ if($i -ge 0 -and $r.Count -gt $i){ return $r[$i] } return '' }
 function Bump($h,$k){ if($null -eq $k -or $k -eq ''){return}; if(-not $h.ContainsKey($k)){$h[$k]=0}; $h[$k]++ }
+# interna um valor numa lista (p/ indices compactos no resp da aba Perfil)
+function InternL($val,$list,$map){ if(-not $map.ContainsKey($val)){ $map[$val]=$list.Count; [void]$list.Add($val) }; return $map[$val] }
 function DistArr($h){ $out=@(); foreach($e in ($h.GetEnumerator()|Sort-Object Value -Descending)){ if([string]$e.Key -eq ''){continue}; $out+=[pscustomobject]@{label=[string]$e.Key;n=[int]$e.Value} }; return ,@($out) }
 function Sum0($arr,$p){ $s=($arr|Measure-Object $p -Sum).Sum; if($null -eq $s){return 0}; return $s }
 
@@ -267,6 +269,7 @@ function Build-Funnel($cfg){
   $leadRows=New-Object System.Collections.Generic.List[object]
   $dState=@{}; $dCity=@{}; $dChannel=@{}; $leadMails=@{}; $nTest=0
   $srcDay=@{}; $paidDay=@{}; $srcTot=@{}   # diario por rede + pago/org por dia
+  $leadUtm=@{}   # email -> {fonte(rede), meio(utm_medium), campanha(utm_campaign)} p/ os filtros da aba Perfil
   if($leadsOk){ foreach($r in $ld){
     if($null -eq $r -or $r.Count -le $L_UCAMP){ continue }
     $mail=Norm $r[$L_MAIL]
@@ -297,7 +300,7 @@ function Build-Funnel($cfg){
       if(-not $paidDay.ContainsKey($d)){ $paidDay[$d]=@{pago=0;org=0} }
       if($paid){ $paidDay[$d].pago++ } else { $paidDay[$d].org++ }
     }
-    $em=$mail.ToLower(); if($em -ne ''){ $leadMails[$em]=$true }
+    $em=$mail.ToLower(); if($em -ne ''){ $leadMails[$em]=$true; if(-not $leadUtm.ContainsKey($em)){ $leadUtm[$em]=@{s=$chan; m=(Deaccent $med); c=$camp} } }
     $leadRows.Add([pscustomobject]@{date=$d;paid=$paid;channel=$chan;plat=$plat;state=$stt;camp=$cName;adset=$sName;ad=$aName;qmail=$em})
   } }
 
@@ -348,11 +351,21 @@ function Build-Funnel($cfg){
     }
   }
   # respRows (todos os respondentes, p/ a aba Perfil do Lead) — JSON manual injetado via placeholder
+  # linha = [date, cls, idade, mom, renda, dispon, invest, curso, fonteIdx, meioIdx, campanhaIdx]
   $rsb=New-Object Text.StringBuilder; [void]$rsb.Append('['); $rfirst=$true; $rA=0;$rB=0;$rC=0
-  foreach($e in $respProfile.Values){
+  $srcL=New-Object System.Collections.Generic.List[string]; $srcMap=@{}
+  $medL=New-Object System.Collections.Generic.List[string]; $medMap=@{}
+  $campL=New-Object System.Collections.Generic.List[string]; $campMap=@{}
+  foreach($em in $respProfile.Keys){
+    $e=$respProfile[$em]
     if($e.cls -eq 'A'){$rA++}elseif($e.cls -eq 'C'){$rC++}else{$rB++}
+    $u = if($leadUtm.ContainsKey($em)){ $leadUtm[$em] } else { @{s='(sem lead)';m='';c=''} }
+    $si=InternL $u.s $srcL $srcMap
+    $mi=InternL $(if($u.m -eq ''){'(sem meio)'}else{$u.m}) $medL $medMap
+    $cp= if($u.c -eq ''){'(sem campanha)'}elseif($u.c -match '\|'){ (($u.c -split '\|')[-1]).Trim() }else{ $u.c }
+    $ci=InternL $cp $campL $campMap
     if(-not $rfirst){ [void]$rsb.Append(',') }; $rfirst=$false
-    [void]$rsb.Append('["'+$e.date+'","'+$e.cls+'",'+$e.a+','+$e.m+','+$e.r+','+$e.p+','+$e.v+','+$e.u+']')
+    [void]$rsb.Append('["'+$e.date+'","'+$e.cls+'",'+$e.a+','+$e.m+','+$e.r+','+$e.p+','+$e.v+','+$e.u+','+$si+','+$mi+','+$ci+']')
   }
   [void]$rsb.Append(']'); $respJson=$rsb.ToString()
 
@@ -446,6 +459,7 @@ function Build-Funnel($cfg){
       ref=[pscustomobject]@{ docs='L17-L20 (Prosperus)'; respondents=53363; buyers=652; baseRate=1.22; convA=2.53; convC=0.27 }
     }
     resp='__RESP__'
+    respLeg=[pscustomobject]@{ src=@($srcL); med=@($medL); camp=@($campL) }
     daily=@($dailyArr); grain=@($grainArr)
   }
   $json = $payload | ConvertTo-Json -Depth 12 -Compress
