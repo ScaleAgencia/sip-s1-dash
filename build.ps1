@@ -22,6 +22,7 @@ $FUNNELS = @(
     goalSpend=0; goalDate='' }
   [ordered]@{ key='l21'; label='SIP-L21';
     queriesId='1MzEn8jtxvEQbAWgA1Btg1cL5Q-mB3oA8KygVJfrgszo'; metaGid='0'; googleGid='1609119011';
+    googleGids2=@('1263836529');   # abas Google EXTRAS (mesmas colunas): campanha "publico quente" (P2-QUENTE)
     leadsId='19vondd8YlTF4f-nhu3guZAocwqrJz0ofEplbAYEbp5s';   leadsGid='1648797035'
     goalSpend=480000; goalDate='2026-09-14' }   # meta de investimento c/ imposto ate 14/09
 )
@@ -221,7 +222,13 @@ function Build-Funnel($cfg){
   Get-Sheet $cfg.queriesId $cfg.metaGid   $qCsv
   Get-Sheet $cfg.queriesId $cfg.googleGid $qgCsv
   $q = Read-Csv $qCsv;  $qh=$q[0];  $qd=$q[1..($q.Count-1)]
-  $qg= Read-Csv $qgCsv; $qgh=$qg[0]; $qgd=$qg[1..($qg.Count-1)]
+  $qg= Read-Csv $qgCsv; $qgh=$qg[0]; $qgd=@($qg[1..($qg.Count-1)])
+  # ---- abas Google EXTRAS (mesmas colunas do Google): concatena as linhas ----
+  if($cfg.googleGids2){ foreach($xg in $cfg.googleGids2){
+    $xCsv=Join-Path $dataDir ("queries_google_"+$xg+".csv"); Get-Sheet $cfg.queriesId $xg $xCsv
+    $xg2=Read-Csv $xCsv
+    if($xg2.Count -gt 1){ $qgd += @($xg2[1..($xg2.Count-1)]); Write-Host ("  +aba Google extra gid "+$xg+": "+($xg2.Count-1)+" linhas") }
+  } }
 
   # ---- download leads (pode estar restrito: degrada p/ funil sem leads) ----
   $ld=@(); $lh=@(); $leadsOk=$true
