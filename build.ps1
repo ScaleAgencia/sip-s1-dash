@@ -22,7 +22,8 @@ $FUNNELS = @(
     goalSpend=0; goalDate='' }
   [ordered]@{ key='l21'; label='SIP-L21';
     queriesId='1MzEn8jtxvEQbAWgA1Btg1cL5Q-mB3oA8KygVJfrgszo'; metaGid='0'; googleGid='1609119011';
-    googleGids2=@('1263836529');   # abas Google EXTRAS (mesmas colunas): campanha "publico quente" (P2-QUENTE)
+    # (Google agora consolida TODAS as campanhas numa aba so, gid 1609119011 -> sem abas extras.
+    #  o campo googleGids2 continua suportado no codigo p/ uso futuro, mas fica vazio aqui.)
     leadsId='19vondd8YlTF4f-nhu3guZAocwqrJz0ofEplbAYEbp5s';   leadsGid='1648797035'
     goalSpend=480000; goalDate='2026-09-14' }   # meta de investimento c/ imposto ate 14/09
 )
