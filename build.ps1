@@ -172,18 +172,20 @@ function Sum0($arr,$p){ $s=($arr|Measure-Object $p -Sum).Sum; if($null -eq $s){r
 # nomes reais das queries (p/ casar a atribuicao), por canal.
 # AD_051 pode aparecer em 2 campanhas Meta -> casar por CAMPANHA+ANUNCIO (nao so anuncio)
 function BuildSets($rows,$ci,$si,$ai){
-  $S=@{campSet=@();campDe=@{};adDe=@{};campAdToAdset=@{}}
+  $S=@{campSet=@();campDe=@{};adDe=@{};campAdToAdset=@{};campAdsetSet=@{}}
   foreach($r in $rows){
     if($null -eq $r -or $ci -lt 0 -or $r.Count -le $ci){ continue }
     $cn=Norm $r[$ci]; $sn= if($si -ge 0 -and $r.Count -gt $si){Norm $r[$si]}else{''}; $an= if($ai -ge 0 -and $r.Count -gt $ai){Norm $r[$ai]}else{''}
     if($cn -ne '' -and ($S.campSet -notcontains $cn)){ $S.campSet+=$cn; $S.campDe[(Deaccent $cn)]=$cn }
     if($an -ne ''){ $S.adDe[(Deaccent $an)]=$an }
     if($cn -ne '' -and $an -ne '' -and $sn -ne ''){ $S.campAdToAdset[(Deaccent $cn)+'||'+(Deaccent $an)]=$sn }
+    # conjuntos VALIDOS por campanha (p/ casar o conjunto real via utm_term do lead)
+    if($cn -ne '' -and $sn -ne ''){ $S.campAdsetSet[(Deaccent $cn)+'||'+(Deaccent $sn)]=$sn }
   }
   return $S
 }
 # atribui um lead a um canal: casa utm_campaign -> campanha do canal; utm_content -> anuncio; conjunto/adgroup derivado
-function Attribute($camp,$cont,$S){
+function Attribute($camp,$cont,$term,$S){
   $v=Norm $camp; $cName=''
   if($v -ne ''){ if($S.campSet -contains $v){ $cName=$v } else { $dd=Deaccent $v; if($S.campDe.ContainsKey($dd)){ $cName=$S.campDe[$dd] } } }
   if($cName -eq ''){ return $null }   # nao e desse canal
@@ -191,6 +193,11 @@ function Attribute($camp,$cont,$S){
   if($c2 -ne ''){ $add=Deaccent $c2; $aRaw= if($S.adDe.ContainsKey($add)){$S.adDe[$add]}else{''}
     $key=(Deaccent $cName)+'||'+$add
     if($aRaw -ne '' -and $S.campAdToAdset.ContainsKey($key)){ $aName=$aRaw; $sName=$S.campAdToAdset[$key] } }
+  # CONJUNTO real via utm_term: tem PRIORIDADE (ex.: lookalike LL1/3/6/10% usam o MESMO
+  # anuncio -> derivar por anuncio jogaria tudo num conjunto so). So sobrepoe se o utm_term
+  # bater com um conjunto valido DESSA campanha.
+  $t2=Norm $term
+  if($t2 -ne ''){ $tk=(Deaccent $cName)+'||'+(Deaccent $t2); if($S.campAdsetSet.ContainsKey($tk)){ $sName=$S.campAdsetSet[$tk] } }
   return @{camp=$cName;adset=$sName;ad=$aName}
 }
 function NowBR(){
@@ -299,8 +306,8 @@ function Build-Funnel($cfg){
     $stt = if($L_STATE -ge 0 -and $r.Count -gt $L_STATE){ TitleFirst $r[$L_STATE] } else { '' }
     $cty = if($L_CITY  -ge 0 -and $r.Count -gt $L_CITY ){ TitleFirst $r[$L_CITY]  } else { '' }
     # atribuicao por CANAL: casa 1o com Meta, senao com Google, senao organico/sem rastreio
-    $plat=''; $at=Attribute $camp $cont $MS
-    if($null -ne $at){ $plat='meta' } else { $at=Attribute $camp $cont $GS; if($null -ne $at){ $plat='google' } }
+    $plat=''; $at=Attribute $camp $cont $term $MS
+    if($null -ne $at){ $plat='meta' } else { $at=Attribute $camp $cont $term $GS; if($null -ne $at){ $plat='google' } }
     if($plat -ne ''){
       $cName=$at.camp; $sName=$at.adset; $aName=$at.ad
       if($d -ne 'sem-data'){ $o=GetDay $plat $d; $o.leads++; FaseAdd $o $tag 'leads' }
