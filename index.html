@@ -48,6 +48,7 @@
     <button class="tab active" data-tab="funil">Funil &amp; Otimização</button>
     <button class="tab" data-tab="leads">Leads · Visão Geral</button>
     <button class="tab" data-tab="perfil">Perfil do Lead</button>
+    <button class="tab" data-tab="acomp">Acompanhamento geral</button>
     <button class="tab" data-tab="engaje">Pesquisa &amp; Grupos</button>
   </nav>
 
@@ -142,6 +143,20 @@
       <div class="card-h">Leads de agora × perfil do comprador <b class="prosp">Prosperus</b> <span class="hint">pizza a pizza por pergunta · esquerda = leads que chegam agora · direita = quem comprou (L17–L20)</span></div>
       <div id="profMacro"></div>
       <div id="profPies" class="prof-pies"></div>
+    </div>
+  </section>
+
+  <!-- ============ ACOMPANHAMENTO GERAL ============ -->
+  <section class="panel-tab hidden" id="tab-acomp">
+    <div class="prof-periods" id="acompWin"></div>
+    <div id="acompStats"></div>
+    <div class="card">
+      <div class="card-h">Evolução diária · Lead A e seu custo <span class="hint">barras = <b class="cA">Lead A</b> por dia · linha = custo por Lead A · últimos 45 dias</span></div>
+      <div id="acompChart"></div>
+    </div>
+    <div class="card">
+      <div class="card-h">Semana a semana <span class="hint">cada linha = 7 dias (mais recente no topo) · a seta compara com a semana anterior · foco em Lead A e seu custo</span></div>
+      <div class="table-scroll"><table class="tbl" id="acompWeeks"></table></div>
     </div>
   </section>
 

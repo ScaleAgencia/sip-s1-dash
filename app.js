@@ -100,6 +100,11 @@ function hasReach(a){ return (a.reach||0)>0; }
 function hasLPV(a){ return (a.lpv||0)>0; }
 function median(xs){ var a=xs.filter(function(x){return x!=null&&isFinite(x);}).sort(function(x,y){return x-y;}); if(!a.length)return 0; var m=Math.floor(a.length/2); return a.length%2?a[m]:(a[m-1]+a[m])/2; }
 function relClass(v,med){ if(v==null||!isFinite(v)||v<=0||med<=0) return 'cpl-n'; var r=v/med; if(r<=0.85)return 'cpl-g'; if(r<=1.3)return 'cpl-a'; return 'cpl-r'; }
+/* ---------- métricas úteis (impressão/alcance ficam ocultos; só ratios) ---------- */
+function ctrOf(n){ return dv(n.clicks,n.impr)*100; }              // CTR = clique/impressão
+function cpmOf(n){ return dv(n.spend,n.impr)*1000; }              // CPM = custo/mil impressões
+function convPag(n){ return dv(n.leads,n.clicks)*100; }           // conversão de página = clique→lead
+function convQual(n){ return dv(n.la,n.clicks)*100; }             // conv. de página dos qualificados = clique→Lead A
 
 /* ---------- trend ---------- */
 function trendHTML(cur, prev, higherBetter){
@@ -127,31 +132,23 @@ function renderKpiCol(a, p){
     +'<span>'+platLab+' <b>'+intf(a.platLeads)+'</b></span></div></div>';
 
   var cards='';
-  cards+=kpiCard(false,'Impressões',intf(a.impr),
-    subRow('CPM', money(dv(a.spend,a.impr)*1000), trendHTML(dv(a.spend,a.impr)*1000, dv(p.spend,p.impr)*1000, false))
-    + subRow('CTR', pct(dv(a.clicks,a.impr)*100), trendHTML(dv(a.clicks,a.impr), dv(p.clicks,p.impr), true)));
-  if(hasReach(a)) cards+=kpiCard(false,'Alcance'+(channel==='geral'?' <small style="color:var(--muted2)">(Meta)</small>':''),intf(a.reach),
-    subRow('Frequência', nf1.format(dv(a.impr,a.reach))+'x', trendHTML(dv(a.impr,a.reach), dv(p.impr,p.reach), false))
-    + subRow('Custo / mil alcançados', money(dv(a.spend,a.reach)*1000), trendHTML(dv(a.spend,a.reach)*1000, dv(p.spend,p.reach)*1000, false)));
-  cards+=kpiCard(false,'Cliques',intf(a.clicks),
-    subRow('CPC', money(dv(a.spend,a.clicks)), trendHTML(dv(a.spend,a.clicks), dv(p.spend,p.clicks), false))
-    + (hasLPV(a)? subRow('Connect rate <small>(LP÷clique)</small>', pct(dv(a.lpv,a.clicks)*100), trendHTML(dv(a.lpv,a.clicks), dv(p.lpv,p.clicks), true))
-                : subRow('CTR', pct(dv(a.clicks,a.impr)*100), '')));
-  if(hasLPV(a)) cards+=kpiCard(false,'Landing Page Views',intf(a.lpv),
-    subRow('Custo/LPV', money(dv(a.spend,a.lpv)), trendHTML(dv(a.spend,a.lpv), dv(p.spend,p.lpv), false))
-    + subRow('LPV → Lead', pct(dv(a.leads,a.lpv)*100), trendHTML(dv(a.leads,a.lpv), dv(p.leads,p.lpv), true)));
+  // Mídia — só CTR + CPM (impressões/alcance ocultos, a pedido)
+  cards+=kpiCard(false,'CTR <small>(clique / impressão)</small>', pct(ctrOf(a)),
+    subRow('CPM <small>(custo / mil impressões)</small>', money(cpmOf(a)), trendHTML(cpmOf(a), cpmOf(p), false)));
+  // Leads (formulário)
   var originSub = channel==='geral'
     ? subRow('Por canal', '<small><b class="chip-pago">'+intf(a.mLeads)+' Meta</b> · <b class="chip-org">'+intf(a.gLeads)+' Google</b></small>','')
-    : subRow('Conversão clique→lead', pct(dv(a.leads,a.clicks)*100),'');
+    : '';
   cards+=kpiCard(true,'Leads (formulário)',intf(a.leads),
     subRow('CPL', money(cpl), trendHTML(cpl, dv(p.spend,p.leads), false))
-    + subRow('Clique → Lead', pct(dv(a.leads,a.clicks)*100), trendHTML(dv(a.leads,a.clicks), dv(p.leads,p.clicks), true))
+    + subRow('Conversão de página <small>(clique→lead)</small>', pct(convPag(a)), trendHTML(convPag(a), convPag(p), true))
     + originSub);
   // ---- Lead A / B / C (perfil comprador · docs L17-L20) ----
   var cpa=dv(a.spend,a.la), cpaP=dv(p.spend,p.la), qr=a.la+a.lb+a.lc;
   cards+='<div class="kpi-card acard"><div class="kpi-main"><div class="m-lab">Lead A <span class="qtag">o alvo · perseguir</span></div><div class="m-val">'+intf(a.la)+'</div></div>'
     +'<div class="kpi-sub">'
     + subRow('<b>Custo por Lead A</b>', a.la?money(cpa):'—', trendHTML(cpa, cpaP, false))
+    + subRow('Conv. de página qualif. <small>(clique→Lead A)</small>', pct(convQual(a)), trendHTML(convQual(a), convQual(p), true))
     + subRow('Mix A·B·C <small>(quem respondeu)</small>', '<b class="cA">'+intf(a.la)+'</b> · <b class="cB">'+intf(a.lb)+'</b> · <b class="cC">'+intf(a.lc)+'</b> <small>'+(qr?pct(dv(a.la,qr)*100)+' A':'')+'</small>','')
     + '</div></div>';
   el('kpiCol').innerHTML = hero + cards;
@@ -231,19 +228,18 @@ function renderDaily(rng){
   var maxL=Math.max.apply(null,rows.map(function(r){return r.leads||0;}).concat([1]));
   var medCpl=median(rows.map(function(r){return r.leads>0?dv(r.spend,r.leads):null;}));
   var medCpm=median(rows.map(function(r){return r.impr>0?dv(r.spend,r.impr)*1000:null;}));
-  var head='<thead><tr><th>Dia</th><th>Gasto</th><th>Impressões</th><th>Cliques</th><th>Leads</th><th>CPL</th><th>CPM</th><th>CTR</th></tr></thead>';
+  var head='<thead><tr><th>Dia</th><th>Gasto</th><th>Leads</th><th>CPL</th><th>CPM</th><th>CTR</th><th>Conv. pág.</th></tr></thead>';
   var body=rows.map(function(r){
-    var cpl=r.leads>0?dv(r.spend,r.leads):null, cpm=dv(r.spend,r.impr)*1000, ctr=dv(r.clicks,r.impr)*100;
+    var cpl=r.leads>0?dv(r.spend,r.leads):null, cpm=dv(r.spend,r.impr)*1000, ctr=dv(r.clicks,r.impr)*100, cvp=dv(r.leads,r.clicks)*100;
     return '<tr><td>'+fmtBR(r.date)+'</td>'
       +'<td class="num"><span class="heatcell" style="'+heatBg('34,211,238',r.spend/maxS)+'">'+money0(r.spend)+'</span></td>'
-      +'<td class="num">'+intf(r.impr)+'</td>'
-      +'<td class="num">'+intf(r.clicks)+'</td>'
       +'<td class="num"><span class="heatcell" style="'+heatBg('103,232,249',r.leads/maxL)+'">'+intf(r.leads)+'</span></td>'
       +'<td class="num">'+(cpl!=null?'<span class="cpl-pill '+relClass(cpl,medCpl)+'">'+money0(cpl)+'</span>':'—')+'</td>'
       +'<td class="num"><span class="cpl-pill '+relClass(cpm,medCpm)+'">'+money(cpm)+'</span></td>'
-      +'<td class="num">'+pct(ctr)+'</td></tr>';
+      +'<td class="num">'+pct(ctr)+'</td>'
+      +'<td class="num">'+(r.clicks>0?pct(cvp):'—')+'</td></tr>';
   }).join('');
-  if(!rows.length) body='<tr><td colspan="8" class="empty">Sem dados no período.</td></tr>';
+  if(!rows.length) body='<tr><td colspan="7" class="empty">Sem dados no período.</td></tr>';
   el('dailyTbl').innerHTML=head+'<tbody>'+body+'</tbody>';
 }
 
@@ -254,18 +250,21 @@ function accum(n,r){ n.spend+=r.spend||0;n.impr+=r.impr||0;n.reach+=r.reach||0;n
 var expanded={}, treeInited=false;
 /* ordenação da árvore de otimização (clique no cabeçalho) · dir -1=maior→menor, 1=menor→maior */
 var treeSort={key:'leads',dir:-1};
-var TREECOLS=[{k:'name',lab:'Campanha › Conjunto/Grupo › Anúncio',cls:''},{k:'spend',lab:'Gasto',cls:'num'},{k:'leads',lab:'Leads',cls:'num'},
-  {k:'la',lab:'A',cls:'num'},{k:'lb',lab:'B',cls:'num'},{k:'lc',lab:'C',cls:'num'},
-  {k:'cpla',lab:'Custo Lead A',cls:'num'},{k:'cplb',lab:'Custo Lead B',cls:'num'},{k:'cplc',lab:'Custo Lead C',cls:'num'},
+var TREECOLS=[{k:'name',lab:'Campanha › Conjunto/Grupo › Anúncio',cls:''},
+  {k:'spend',lab:'Gasto',cls:'num'},{k:'leads',lab:'Leads',cls:'num'},
+  {k:'ctr',lab:'CTR',cls:'num'},{k:'cpm',lab:'CPM',cls:'num'},{k:'convp',lab:'Conv. pág.',cls:'num'},
+  {k:'la',lab:'Lead A · B · C',cls:'num'},{k:'cpla',lab:'Custo Lead A',cls:'num'},{k:'convq',lab:'Conv. qualif.',cls:'num'},
   {k:null,lab:'Ação',cls:'num'}];
 function treeMetric(n,key){ switch(key){
   case 'spend': return n.spend||0; case 'leads': return n.leads||0;
   case 'la': return n.la||0; case 'lb': return n.lb||0; case 'lc': return n.lc||0;
-  case 'cpla': return n.la>0 ? n.spend/n.la : Infinity;   // sem Lead A = "infinitamente caro"
-  case 'cplb': return n.lb>0 ? n.spend/n.lb : Infinity;
-  case 'cplc': return n.lc>0 ? n.spend/n.lc : Infinity;
+  case 'ctr':   return n.impr>0   ? n.clicks/n.impr     : -1;
+  case 'cpm':   return n.impr>0   ? n.spend/n.impr*1000 : Infinity;  // sem impr = "infinitamente caro"
+  case 'convp': return n.clicks>0 ? n.leads/n.clicks    : -1;
+  case 'convq': return n.clicks>0 ? n.la/n.clicks       : -1;
+  case 'cpla':  return n.la>0 ? n.spend/n.la : Infinity;   // sem Lead A = "infinitamente caro"
   default: return 0; } }
-function treeDefaultDir(key){ return (key==='cpla'||key==='cplb'||key==='cplc'||key==='name') ? 1 : -1; } // custos e nome sobem (melhor primeiro), contagens descem
+function treeDefaultDir(key){ return (key==='cpm'||key==='cpla'||key==='name') ? 1 : -1; } // custos e nome sobem (melhor primeiro), o resto desce
 function sortLabel(){ var c=null; for(var i=0;i<TREECOLS.length;i++){ if(TREECOLS[i].k===treeSort.key) c=TREECOLS[i]; }
   if(!c) return 'ordenado por leads';
   var better = treeSort.dir===treeDefaultDir(treeSort.key);
@@ -285,15 +284,22 @@ function actTag(n,medA){
   return {t:'Manter',c:'act-mant'};
 }
 function abcCell(v,cls){ return '<td class="num">'+(v?'<b class="c'+cls+'">'+intf(v)+'</b>':'<span class="muted3">0</span>')+'</td>'; }
-function metricsCells(n,medA,medB,medC){
-  var cpla=n.la>0?dv(n.spend,n.la):null, cplb=n.lb>0?dv(n.spend,n.lb):null, cplc=n.lc>0?dv(n.spend,n.lc):null, tag=actTag(n,medA);
-  var cA = cpla!=null?'<span class="cpl-pill '+relClass(cpla,medA)+'">'+money0(cpla)+'</span>':'—';
-  var cB = cplb!=null?'<span class="cpl-plain">'+money0(cplb)+'</span>':'—';
-  var cC = cplc!=null?'<span class="cpl-plain">'+money0(cplc)+'</span>':'—';
+function abcMixCell(n){ return '<td class="num abc-mix"><b class="cA">'+intf(n.la)+'</b><small class="muted3"> · '+intf(n.lb)+' · '+intf(n.lc)+'</small></td>'; }
+function metricsCells(n,medA){
+  var cpla=n.la>0?dv(n.spend,n.la):null, tag=actTag(n,medA);
+  var cA  = cpla!=null?'<span class="cpl-pill '+relClass(cpla,medA)+'">'+money0(cpla)+'</span>':'—';
+  var ctr = n.impr>0?   pct(dv(n.clicks,n.impr)*100)   : '—';
+  var cpm = n.impr>0?   money0(dv(n.spend,n.impr)*1000): '—';
+  var cvp = n.clicks>0? pct(dv(n.leads,n.clicks)*100)  : '—';
+  var cvq = n.clicks>0? pct(dv(n.la,n.clicks)*100)     : '—';
   return '<td class="num">'+money0(n.spend)+'</td>'
     +'<td class="num">'+intf(n.leads)+'</td>'
-    +abcCell(n.la,'A')+abcCell(n.lb,'B')+abcCell(n.lc,'C')
-    +'<td class="num">'+cA+'</td><td class="num">'+cB+'</td><td class="num">'+cC+'</td>'
+    +'<td class="num">'+ctr+'</td>'
+    +'<td class="num">'+cpm+'</td>'
+    +'<td class="num">'+cvp+'</td>'
+    +abcMixCell(n)
+    +'<td class="num">'+cA+'</td>'
+    +'<td class="num">'+cvq+'</td>'
     +'<td class="num"><span class="act '+tag.c+'">'+tag.t+'</span></td>'; }
 function treeRow(n,lvl,key,hasKids,medA,medB,medC){
   var caret=hasKids?'<span class="caret'+(expanded[key]?' open':'')+'">▶</span>':'<span class="caret" style="opacity:.2">•</span>';
@@ -702,7 +708,7 @@ function initChannels(){
 }
 /* ---- filtro global de FASE (turma: SIP-S1 / SIP-S2 / ...) ---- */
 function syncFaseUI(){ if(!el('fasebar'))return; Array.prototype.forEach.call(el('fasebar').querySelectorAll('.fbtn2'),function(b){ b.classList.toggle('on', fase===b.getAttribute('data-f')); }); }
-function applyFase(){ treeInited=false; syncFaseUI(); initCoverage(); renderAll(); mountLeads(); mountProfile(); }
+function applyFase(){ treeInited=false; syncFaseUI(); initCoverage(); renderAll(); mountLeads(); mountProfile(); mountAcomp(); }
 function initFases(){ var box=el('fasebar'); if(!box) return; var fs=arr(D.fases);
   if(fs.length<2){ box.innerHTML=''; box.style.display='none'; fase='all'; return; }
   box.style.display='';
@@ -713,9 +719,89 @@ function initFases(){ var box=el('fasebar'); if(!box) return; var fs=arr(D.fases
     b.addEventListener('click',function(){ fase=b.getAttribute('data-f'); applyFase(); }); });
   syncFaseUI();
 }
+/* =================== ACOMPANHAMENTO GERAL (saúde da captação · foco Lead A) =================== */
+var acompWin=7;
+function acompAgg(days){ var o={spend:0,leads:0,la:0,lb:0,lc:0,clicks:0,impr:0};
+  days.forEach(function(d){ o.spend+=d.spend||0;o.leads+=d.leads||0;o.la+=d.la||0;o.lb+=d.lb||0;o.lc+=d.lc||0;o.clicks+=d.clicks||0;o.impr+=d.impr||0; }); return o; }
+function acompMetrics(o){ var q=o.la+o.lb+o.lc; return {
+  volA:o.la, cplA:(o.la>0?o.spend/o.la:null), pctA:(q>0?o.la/q*100:null),
+  aPer100:(o.leads>0?o.la/o.leads*100:null), leads:o.leads, spend:o.spend, q:q }; }
+function acTrend(cur,prev,hb){ // hb: true=maior melhor, false=menor melhor, null=neutro
+  if(prev==null||cur==null||!isFinite(prev)||!isFinite(cur)||prev===0) return '';
+  var c=(cur-prev)/Math.abs(prev)*100; if(Math.abs(c)<0.5) return '';
+  var up=c>0, cls=(hb===null)?'flat':((hb?up:!up)?'up':'down');
+  var txt=Math.abs(c)>300?'&gt;300%':(nf1.format(Math.abs(c))+'%');   // capa exageros (funil novo)
+  return '<span class="trend '+cls+'">'+(up?'▲':'▼')+' '+txt+'</span>'; }
+function acCard(lab,val,cur,prev,hb,sub){
+  return '<div class="ac-card"><div class="ac-lab">'+lab+'</div><div class="ac-val">'+val+' '+acTrend(cur,prev,hb)+'</div><div class="ac-sub">'+(sub||'')+'</div></div>'; }
+function mountAcomp(){
+  if(!el('acompStats')) return;
+  var all=daysInRange([minDate,maxDate]);   // dias com dados (asc) · respeita canal + fase
+  var wins=[{n:7,l:'7 dias'},{n:14,l:'14 dias'},{n:30,l:'30 dias'}];
+  el('acompWin').innerHTML='<span class="pf-h">Comparar janela de:</span>'+wins.map(function(w){return '<button data-n="'+w.n+'" class="pbtn'+(acompWin===w.n?' on':'')+'">'+w.l+'</button>';}).join('');
+  Array.prototype.forEach.call(el('acompWin').querySelectorAll('.pbtn'),function(b){ b.addEventListener('click',function(){ acompWin=+b.getAttribute('data-n'); mountAcomp(); }); });
+  var N=acompWin;
+  var cur=all.slice(Math.max(0,all.length-N)), prev=all.slice(Math.max(0,all.length-2*N),Math.max(0,all.length-N));
+  var mc=acompMetrics(acompAgg(cur)), mp=acompMetrics(acompAgg(prev));
+  var qUp=(mc.pctA!=null&&mp.pctA!=null)?mc.pctA>mp.pctA:null;
+  var cheaper=(mc.cplA!=null&&mp.cplA!=null)?mc.cplA<mp.cplA:null;
+  var status,cls,msg;
+  if(qUp===true&&cheaper===true){ status='MELHORANDO'; cls='hh-good'; msg='Mais Lead A <b>e</b> mais barato que a janela anterior — a captação está esquentando. Continue escalando o que traz Lead A.'; }
+  else if(qUp===false&&cheaper===false){ status='PIORANDO'; cls='hh-bad'; msg='Menos Lead A qualificado <b>e</b> mais caro — a qualidade da captação está caindo. Reveja/pause o que traz Lead C em massa.'; }
+  else if(qUp===null||cheaper===null){ status='POUCOS DADOS'; cls='hh-mid'; msg='Ainda faltam respostas de pesquisa nesta janela p/ um veredito firme. Veja a tendência abaixo.'; }
+  else { status='ESTÁVEL / MISTO'; cls='hh-mid'; msg='Sinais mistos entre <b>qualidade</b> (% Lead A) e <b>custo</b> (R$/Lead A). Olhe os cards e a evolução diária.'; }
+  var hero='<div class="health-hero '+cls+'"><div class="hh-badge">'+status+'</div>'
+    +'<div class="hh-txt"><b>Saúde da captação · '+esc(funLabel(funKey))+'</b> — últimos <b>'+N+'</b> dias vs '+N+' dias anteriores.<br>'+msg
+    +'<br><small>Lead A = perfil do nosso comprador (Prosperus, docs L17–L20). Objetivo: <b>volume de Lead A subindo</b> e <b>custo por Lead A caindo</b>.</small></div></div>';
+  var cards='<div class="ac-grid">'
+    + acCard('Volume de Lead A', intf(mc.volA), mc.volA, mp.volA, true, N+'d anteriores: '+intf(mp.volA))
+    + acCard('Custo por Lead A', mc.cplA!=null?money(mc.cplA):'—', mc.cplA, mp.cplA, false, mp.cplA!=null?('antes: '+money(mp.cplA)):'sem base')
+    + acCard('% Lead A <small>(entre respondentes)</small>', mc.pctA!=null?pct(mc.pctA):'—', mc.pctA, mp.pctA, true, mp.pctA!=null?('antes: '+pct(mp.pctA)):'sem base')
+    + acCard('Lead A por 100 leads', mc.aPer100!=null?nf1.format(mc.aPer100):'—', mc.aPer100, mp.aPer100, true, 'rendimento de Lead A')
+    + acCard('Leads captados', intf(mc.leads), mc.leads, mp.leads, true, N+'d anteriores: '+intf(mp.leads))
+    + acCard('Investimento', money0(mc.spend), mc.spend, mp.spend, null, 'gasto na janela')
+    + '</div>';
+  el('acompStats').innerHTML=hero+cards;
+  acompChart(all); acompWeeks(all);
+}
+function acompChart(days){
+  if(!el('acompChart')) return;
+  var d2=days.slice(Math.max(0,days.length-45));
+  var W=760,H=230,pl=34,pr=44,pt=14,pb=24,pw=W-pl-pr,ph=H-pt-pb,base=pt+ph;
+  var maxA=Math.max.apply(null,d2.map(function(d){return d.la||0;}).concat([1]));
+  var cpls=d2.map(function(d){return d.la>0?dv(d.spend,d.la):null;});
+  var maxC=Math.max.apply(null,cpls.filter(function(x){return x!=null;}).concat([1]));
+  var n=d2.length||1,gw=pw/n,bw=Math.max(3,Math.min(22,gw*0.6));
+  var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
+  [0,0.5,1].forEach(function(f){ var y=pt+ph*(1-f); s+='<line x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'" stroke="#182034" stroke-dasharray="2 3"/>';
+    s+='<text x="'+(pl-4)+'" y="'+(y+3)+'" text-anchor="end" fill="#586a8c" font-size="9">'+Math.round(maxA*f)+'</text>';
+    s+='<text x="'+(W-pr+4)+'" y="'+(y+3)+'" text-anchor="start" fill="#c98a2a" font-size="9">'+Math.round(maxC*f)+'</text>'; });
+  d2.forEach(function(d,i){ var xc=pl+gw*i+gw/2,h=ph*dv(d.la,maxA);
+    if(d.la>0) s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-h).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="1.5" fill="rgba(52,211,153,.42)"/>'; });
+  var pts=[]; d2.forEach(function(d,i){ if(cpls[i]!=null){ var xc=pl+gw*i+gw/2,y=base-ph*dv(cpls[i],maxC); pts.push([xc,y]); } });
+  if(pts.length>1) s+='<path d="M'+pts.map(function(pp){return pp[0].toFixed(1)+' '+pp[1].toFixed(1);}).join(' L')+'" fill="none" stroke="'+COL.warn+'" stroke-width="2"/>';
+  pts.forEach(function(pp){ s+='<circle cx="'+pp[0].toFixed(1)+'" cy="'+pp[1].toFixed(1)+'" r="2.4" fill="'+COL.warn+'"/>'; });
+  xticks(d2).forEach(function(i){ var xc=pl+gw*i+gw/2; s+='<text x="'+xc.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" fill="#586a8c" font-size="9">'+fmtBR(d2[i].date)+'</text>'; });
+  s+='</svg>';
+  el('acompChart').innerHTML='<div class="chart">'+s+'</div><div class="chart-legend"><span><span class="dot" style="background:rgba(52,211,153,.7)"></span>Lead A / dia</span><span><span class="ln" style="background:'+COL.warn+'"></span>Custo por Lead A</span></div>';
+}
+function acompWeeks(days){
+  if(!el('acompWeeks')) return;
+  var weeks=[]; for(var end=days.length; end>0 && weeks.length<8; end-=7){ var seg=days.slice(Math.max(0,end-7),end); if(seg.length) weeks.push(seg); }
+  var rows=weeks.map(function(seg){ return {ini:seg[0].date, fim:seg[seg.length-1].date, m:acompMetrics(acompAgg(seg))}; });
+  var head='<thead><tr><th>Semana</th><th class="num">Lead A</th><th class="num">Custo Lead A</th><th class="num">% Lead A</th><th class="num">Leads</th><th class="num">Invest.</th></tr></thead>';
+  var body=rows.map(function(r,i){ var pm=(i+1<rows.length)?rows[i+1].m:null;
+    return '<tr><td>'+fmtBR(r.ini)+' – '+fmtBR(r.fim)+'</td>'
+      +'<td class="num"><b class="cA">'+intf(r.m.volA)+'</b>'+(pm?acTrend(r.m.volA,pm.volA,true):'')+'</td>'
+      +'<td class="num">'+(r.m.cplA!=null?money0(r.m.cplA):'—')+(pm&&pm.cplA!=null?acTrend(r.m.cplA,pm.cplA,false):'')+'</td>'
+      +'<td class="num">'+(r.m.pctA!=null?pct(r.m.pctA):'—')+(pm&&pm.pctA!=null?acTrend(r.m.pctA,pm.pctA,true):'')+'</td>'
+      +'<td class="num">'+intf(r.m.leads)+'</td><td class="num">'+money0(r.m.spend)+'</td></tr>'; }).join('');
+  if(!rows.length) body='<tr><td colspan="6" class="empty">Sem dados.</td></tr>';
+  el('acompWeeks').innerHTML=head+'<tbody>'+body+'</tbody>';
+}
 function renderAll(){ var rng=rangeFor(period), a=aggDaily(rng), p=aggDaily(prevRange(rng)), days=daysInRange(rng);
   renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderDaily(rng); renderTree(rng); }
-var TABS=['funil','leads','perfil','engaje'];
+var TABS=['funil','leads','perfil','acomp','engaje'];
 function activateTab(id){ Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(x){x.classList.toggle('active',x.getAttribute('data-tab')===id);});
   TABS.forEach(function(k){ el('tab-'+k).classList.toggle('hidden',k!==id); }); }
 function initTabs(){ Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(t){ t.addEventListener('click',function(){ var id=t.getAttribute('data-tab'); activateTab(id); if(history.replaceState)history.replaceState(null,'','#'+id); }); });
@@ -750,8 +836,8 @@ function switchFunnel(key){
   funKey=key; setFunnelVars();
   period='tudo'; customRange=null; channel='geral'; treeInited=false; expanded={};
   updateBranding(); syncFunnelUI(); syncChannelUI();
-  profPeriod='tudo'; profSrc=-1; profMed=-1; profCamp=-1; fase='all';
-  initFases(); initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal();
+  profPeriod='tudo'; profSrc=-1; profMed=-1; profCamp=-1; fase='all'; acompWin=7;
+  initFases(); initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp();
   if(history.replaceState){ history.replaceState(null,'', location.pathname+'?funnel='+key+(location.hash||'')); }
 }
 function initFunnels(){
@@ -766,5 +852,5 @@ function initFunnels(){
 }
 
 if(!funnels.length || (!daily.length && !grain.length)){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
-else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); }
+else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); }
 })();

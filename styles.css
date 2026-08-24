@@ -353,3 +353,23 @@ b{font-weight:700}
 .foot{color:var(--muted2);font-size:11.5px;text-align:center;margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
 .foot b{color:var(--muted)}
 .empty{color:var(--muted2);font-size:12.5px;padding:14px 2px;text-align:center}
+
+/* ===== Acompanhamento geral (saúde da captação) ===== */
+.trend.flat{color:var(--muted2)}
+.abc-mix small{font-weight:600;font-size:11px}
+.health-hero{display:flex;align-items:center;gap:16px;border-radius:14px;padding:16px 18px;margin-bottom:16px;border:1px solid var(--line);background:var(--panel2)}
+.health-hero.hh-good{background:linear-gradient(135deg,rgba(52,211,153,.18),transparent),var(--panel2);border-color:rgba(52,211,153,.45)}
+.health-hero.hh-bad{background:linear-gradient(135deg,rgba(242,99,126,.18),transparent),var(--panel2);border-color:rgba(242,99,126,.45)}
+.health-hero.hh-mid{background:linear-gradient(135deg,rgba(245,176,65,.16),transparent),var(--panel2);border-color:rgba(245,176,65,.42)}
+.hh-badge{flex:0 0 auto;font-size:15px;font-weight:800;letter-spacing:.5px;padding:12px 18px;border-radius:12px;text-align:center;line-height:1.15;white-space:nowrap}
+.hh-good .hh-badge{background:#34d399;color:#04120c}
+.hh-bad .hh-badge{background:#f2637e;color:#1a0509}
+.hh-mid .hh-badge{background:#f5b041;color:#1a1002}
+.hh-txt{font-size:13px;color:var(--muted);line-height:1.5}.hh-txt b{color:var(--ink2)}.hh-txt small{color:var(--muted2)}
+.ac-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:4px}
+.ac-card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.ac-lab{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.ac-lab small{font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted2)}
+.ac-val{font-size:26px;font-weight:800;color:var(--ink);margin-top:6px;line-height:1}
+.ac-val .trend{font-size:12px;margin-left:6px}
+.ac-sub{font-size:11.5px;color:var(--muted2);margin-top:6px}
