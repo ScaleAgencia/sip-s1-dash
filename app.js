@@ -764,6 +764,12 @@ function mountAcomp(){
   el('acompStats').innerHTML=hero+cards;
   acompChart(all); acompWeeks(all);
 }
+function tipAcomp(d){
+  var q=(d.la||0)+(d.lb||0)+(d.lc||0);
+  return '<div class="tt-d">'+fmtBR(d.date)+'</div>'
+    +'<div class="tt-r"><span style="color:#34d399">Lead A</span><b>'+intf(d.la||0)+'</b></div>'
+    +'<div class="tt-r"><span style="color:'+COL.warn+'">Custo por Lead A</span><b>'+(d.la>0?money(dv(d.spend,d.la)):'—')+'</b></div>'
+    +'<div class="tt-sub">Leads '+intf(d.leads||0)+' · % Lead A '+(q>0?pct(dv(d.la,q)*100):'—')+' · Invest. '+money0(d.spend)+'</div>'; }
 function acompChart(days){
   if(!el('acompChart')) return;
   var d2=days.slice(Math.max(0,days.length-45));
@@ -782,8 +788,9 @@ function acompChart(days){
   if(pts.length>1) s+='<path d="M'+pts.map(function(pp){return pp[0].toFixed(1)+' '+pp[1].toFixed(1);}).join(' L')+'" fill="none" stroke="'+COL.warn+'" stroke-width="2"/>';
   pts.forEach(function(pp){ s+='<circle cx="'+pp[0].toFixed(1)+'" cy="'+pp[1].toFixed(1)+'" r="2.4" fill="'+COL.warn+'"/>'; });
   xticks(d2).forEach(function(i){ var xc=pl+gw*i+gw/2; s+='<text x="'+xc.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" fill="#586a8c" font-size="9">'+fmtBR(d2[i].date)+'</text>'; });
-  s+='</svg>';
+  s+=hitRects(d2,pl,gw,pt,ph)+'</svg>';
   el('acompChart').innerHTML='<div class="chart">'+s+'</div><div class="chart-legend"><span><span class="dot" style="background:rgba(52,211,153,.7)"></span>Lead A / dia</span><span><span class="ln" style="background:'+COL.warn+'"></span>Custo por Lead A</span></div>';
+  bindHits('acompChart', d2, tipAcomp);
 }
 function acompWeeks(days){
   if(!el('acompWeeks')) return;
