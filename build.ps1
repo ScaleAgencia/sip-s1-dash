@@ -21,7 +21,7 @@ $FUNNELS = @(
     leadsId='1nTJYpjYLlK8ZOfA-V9faNSuqz-oegrhccmOgGvrEzm0';   leadsGid='566747937'
     goalSpend=0; goalDate=''
     # metas de investimento POR FASE (tag do lead) · com impostos · chave = tag exata
-    faseGoals=@{ 'SIP-S3'=@{ spend=40000; date='2026-09-06' } } }
+    faseGoals=@{ 'SIP-S3'=@{ spend=20000; date='2026-09-06' } } }
   [ordered]@{ key='l21'; label='SIP-L21';
     queriesId='1MzEn8jtxvEQbAWgA1Btg1cL5Q-mB3oA8KygVJfrgszo'; metaGid='0'; googleGid='1609119011';
     # (Google agora consolida TODAS as campanhas numa aba so, gid 1609119011 -> sem abas extras.
@@ -220,6 +220,33 @@ function GetGrain($ch,$d,$c,$s,$a){ $key=($ch+[char]31+$d+[char]31+$c+[char]31+$
   return $grain[$key] }
 # acumula lead por FASE (tag SIP-S1/SIP-S2/...) dentro de um daily/grain
 function FaseAdd($o,$tag,$field){ if($tag -eq ''){$tag='(sem tag)'}; if(-not $o.byFase.ContainsKey($tag)){ $o.byFase[$tag]=@{leads=0;la=0;lb=0;lc=0} }; $o.byFase[$tag][$field]++ }
+# emite as linhas por fase de UM registro (daily ou grain).
+# REGRA (turma): o GASTO/mídia vai TODO p/ a turma ATIVA da data ($active[date] = tag dominante
+# nos leads do dia). Assim, quando a tag vira S3, todo o gasto daquela data em diante conta p/ S3
+# (mesmo em campanhas ainda sem lead S3). Leads/Lead A continuam pela tag REAL de cada lead.
+function EmitFase($rec,$active,$list,$isGrain){
+  if(-not ($rec.spend -gt 0 -or $rec.leads -gt 0 -or $rec.impr -gt 0)){ return }
+  $sf = if($active.ContainsKey($rec.date)){ $active[$rec.date] } else { '(sem fase)' }
+  $keys=New-Object System.Collections.Generic.List[string]
+  foreach($f in $rec.byFase.Keys){ if(-not $keys.Contains($f)){ [void]$keys.Add($f) } }
+  if(-not $keys.Contains($sf)){ [void]$keys.Add($sf) }
+  foreach($f in $keys){
+    $isSp = ($f -eq $sf)
+    $bf = if($rec.byFase.ContainsKey($f)){ $rec.byFase[$f] } else { @{leads=0;la=0;lb=0;lc=0} }
+    if([int]$bf.leads -le 0 -and -not $isSp){ continue }   # linha vazia (sem lead e sem gasto)
+    $o=[ordered]@{ channel=$rec.channel; date=$rec.date }
+    if($isGrain){ $o.campaign=$rec.campaign; $o.adset=$rec.adset; $o.ad=$rec.ad }
+    $o.fase=$f
+    $o.spend    = $(if($isSp){[double]$rec.spend}else{0.0})
+    $o.impr     = $(if($isSp){[int]$rec.impr}else{0})
+    $o.reach    = $(if($isSp){[int]$rec.reach}else{0})
+    $o.clicks   = $(if($isSp){[int]$rec.clicks}else{0})
+    $o.lpv      = $(if($isSp){[int]$rec.lpv}else{0})
+    $o.platLeads= $(if($isSp){[int]$rec.platLeads}else{0})
+    $o.leads=[int]$bf.leads; $o.la=[int]$bf.la; $o.lb=[int]$bf.lb; $o.lc=[int]$bf.lc
+    [void]$list.Add([pscustomobject]$o)
+  }
+}
 
 function Build-Funnel($cfg){
   $name=$cfg.label
@@ -450,18 +477,23 @@ function Build-Funnel($cfg){
     }
   }
 
-  # ---- arrays finais (por FASE: gasto rateado pela participacao de leads de cada fase no dia) ----
+  # ---- TURMA ATIVA POR DATA: tag dominante nos leads do dia (as tags só avançam S1->S2->S3...) ----
+  $ldf=@{}
+  foreach($lr in $leadRows){ if($lr.date -notmatch '^\d{4}-\d{2}-\d{2}$'){ continue }
+    $tg= if($lr.tag -ne ''){ $lr.tag } else { '(sem tag)' }
+    if(-not $ldf.ContainsKey($lr.date)){ $ldf[$lr.date]=@{} }
+    if(-not $ldf[$lr.date].ContainsKey($tg)){ $ldf[$lr.date][$tg]=0 }; $ldf[$lr.date][$tg]++ }
+  $activeFase=@{}
+  foreach($dt in $ldf.Keys){ $best=''; $bc=-1
+    foreach($tg in $ldf[$dt].Keys){ if($tg -eq '(sem tag)'){ continue }; if($ldf[$dt][$tg] -gt $bc){ $bc=$ldf[$dt][$tg]; $best=$tg } }
+    if($best -eq ''){ $best='(sem fase)' }; $activeFase[$dt]=$best }
+
+  # ---- arrays finais por FASE (gasto/midia -> turma ativa da data; leads/Lead A -> tag real) ----
   $dailyL=New-Object System.Collections.Generic.List[object]
-  foreach($rec in $daily.Values){ $tl=$rec.leads
-    if($tl -gt 0){ foreach($f in $rec.byFase.Keys){ $bf=$rec.byFase[$f]; $sh=$bf.leads/$tl
-      $dailyL.Add([pscustomobject]@{channel=$rec.channel;date=$rec.date;fase=$f;spend=($rec.spend*$sh);impr=[int][math]::Round($rec.impr*$sh);reach=[int][math]::Round($rec.reach*$sh);clicks=[int][math]::Round($rec.clicks*$sh);lpv=[int][math]::Round($rec.lpv*$sh);platLeads=[int][math]::Round($rec.platLeads*$sh);leads=$bf.leads;la=$bf.la;lb=$bf.lb;lc=$bf.lc}) } }
-    elseif($rec.spend -gt 0 -or $rec.impr -gt 0){ $dailyL.Add([pscustomobject]@{channel=$rec.channel;date=$rec.date;fase='(sem fase)';spend=$rec.spend;impr=$rec.impr;reach=$rec.reach;clicks=$rec.clicks;lpv=$rec.lpv;platLeads=$rec.platLeads;leads=0;la=0;lb=0;lc=0}) } }
+  foreach($rec in $daily.Values){ EmitFase $rec $activeFase $dailyL $false }
   $dailyArr=@($dailyL | Sort-Object date)
   $grainL=New-Object System.Collections.Generic.List[object]
-  foreach($rec in $grain.Values){ if(-not ($rec.spend -gt 0 -or $rec.leads -gt 0)){ continue }; $tl=$rec.leads
-    if($tl -gt 0){ foreach($f in $rec.byFase.Keys){ $bf=$rec.byFase[$f]; $sh=$bf.leads/$tl
-      $grainL.Add([pscustomobject]@{channel=$rec.channel;date=$rec.date;campaign=$rec.campaign;adset=$rec.adset;ad=$rec.ad;fase=$f;spend=($rec.spend*$sh);impr=[int][math]::Round($rec.impr*$sh);reach=[int][math]::Round($rec.reach*$sh);clicks=[int][math]::Round($rec.clicks*$sh);lpv=[int][math]::Round($rec.lpv*$sh);platLeads=[int][math]::Round($rec.platLeads*$sh);leads=$bf.leads;la=$bf.la;lb=$bf.lb;lc=$bf.lc}) } }
-    else { $grainL.Add([pscustomobject]@{channel=$rec.channel;date=$rec.date;campaign=$rec.campaign;adset=$rec.adset;ad=$rec.ad;fase='(sem fase)';spend=$rec.spend;impr=$rec.impr;reach=$rec.reach;clicks=$rec.clicks;lpv=$rec.lpv;platLeads=$rec.platLeads;leads=0;la=0;lb=0;lc=0}) } }
+  foreach($rec in $grain.Values){ EmitFase $rec $activeFase $grainL $true }
   $grainArr=@($grainL | Sort-Object date)
   $dates=@($dailyArr | Where-Object { $_.date -match '^\d{4}-\d{2}-\d{2}$' } | ForEach-Object { $_.date } | Sort-Object -Unique)
   $leadDates=@($leadRows | Where-Object { $_.date -match '^\d{4}-\d{2}-\d{2}$' } | ForEach-Object { $_.date } | Sort-Object)
