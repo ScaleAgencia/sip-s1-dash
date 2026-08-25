@@ -46,6 +46,7 @@
 
   <nav class="tabs" id="tabs">
     <button class="tab active" data-tab="funil">Funil &amp; Otimização</button>
+    <button class="tab" data-tab="micro">Otimização micro</button>
     <button class="tab" data-tab="leads">Leads · Visão Geral</button>
     <button class="tab" data-tab="perfil">Perfil do Lead</button>
     <button class="tab" data-tab="acomp">Acompanhamento geral</button>
@@ -143,6 +144,23 @@
       <div class="card-h">Leads de agora × perfil do comprador <b class="prosp">Prosperus</b> <span class="hint">pizza a pizza por pergunta · esquerda = leads que chegam agora · direita = quem comprou (L17–L20)</span></div>
       <div id="profMacro"></div>
       <div id="profPies" class="prof-pies"></div>
+    </div>
+  </section>
+
+  <!-- ============ OTIMIZAÇÃO MICRO ============ -->
+  <section class="panel-tab hidden" id="tab-micro">
+    <div id="microWrap">
+      <div class="micro-controls">
+        <div class="prof-periods" id="microPeriods"></div>
+        <div class="prof-periods micro-mets" id="microMetric"></div>
+      </div>
+      <div class="micro-crumb" id="microCrumb"></div>
+      <div class="card">
+        <div class="card-h">Tendência por data <span class="hint">clique numa linha da tabela p/ descer o nível: <b>campanha › conjunto › anúncio</b> · barras = métrica/dia · linha tracejada = tendência</span></div>
+        <div id="microVerdict"></div>
+        <div id="microChart"></div>
+      </div>
+      <div id="microTable"></div>
     </div>
   </section>
 

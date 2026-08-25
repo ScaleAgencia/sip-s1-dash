@@ -722,7 +722,7 @@ function initChannels(){
 }
 /* ---- filtro global de FASE (turma: SIP-S1 / SIP-S2 / ...) ---- */
 function syncFaseUI(){ if(!el('fasebar'))return; Array.prototype.forEach.call(el('fasebar').querySelectorAll('.fbtn2'),function(b){ b.classList.toggle('on', fase===b.getAttribute('data-f')); }); }
-function applyFase(){ treeInited=false; syncFaseUI(); initCoverage(); renderAll(); mountLeads(); mountProfile(); mountAcomp(); }
+function applyFase(){ treeInited=false; syncFaseUI(); initCoverage(); renderAll(); mountLeads(); mountProfile(); mountAcomp(); mountMicro(); }
 function initFases(){ var box=el('fasebar'); if(!box) return; var fs=arr(D.fases);
   if(fs.length<2){ box.innerHTML=''; box.style.display='none'; fase='all'; return; }
   box.style.display='';
@@ -733,6 +733,121 @@ function initFases(){ var box=el('fasebar'); if(!box) return; var fs=arr(D.fases
     b.addEventListener('click',function(){ fase=b.getAttribute('data-f'); applyFase(); }); });
   syncFaseUI();
 }
+/* =================== OTIMIZAÇÃO MICRO (drill-down campanha›conjunto›anúncio + tendência por data) =================== */
+var microPath=[], microMetric='leads', microPeriod='tudo';
+var MICROMETS=[
+  {k:'leads',lab:'Leads',hb:true, fmt:function(v){return intf(v);}},
+  {k:'cpl',  lab:'CPL',  hb:false,fmt:function(v){return money0(v);}},
+  {k:'la',   lab:'Lead A',hb:true,fmt:function(v){return intf(v);}},
+  {k:'cpla', lab:'Custo Lead A',hb:false,fmt:function(v){return money0(v);}},
+  {k:'ctr',  lab:'CTR',  hb:true, fmt:function(v){return pct(v);}},
+  {k:'spend',lab:'Invest.',hb:null,fmt:function(v){return money0(v);}}
+];
+function microMeta(k){ for(var i=0;i<MICROMETS.length;i++) if(MICROMETS[i].k===k) return MICROMETS[i]; return MICROMETS[0]; }
+function microColor(k){ return (k==='cpl'||k==='cpla')?'245,176,65':(k==='la'?'52,211,153':(k==='ctr'?'139,124,240':'34,211,238')); }
+function microVal(d,k){ switch(k){
+  case 'leads': return d.leads||0; case 'spend': return d.spend||0; case 'la': return d.la||0;
+  case 'cpl':  return d.leads>0? d.spend/d.leads : null;
+  case 'cpla': return d.la>0?   d.spend/d.la    : null;
+  case 'ctr':  return d.impr>0? d.clicks/d.impr*100 : null;
+  } return 0; }
+function microRange(){ var mx=maxDate;
+  if(microPeriod==='7d')  return [addDays(mx,-6),mx];
+  if(microPeriod==='14d') return [addDays(mx,-13),mx];
+  if(microPeriod==='30d') return [addDays(mx,-29),mx];
+  return [minDate,maxDate]; }
+function microMatch(r){
+  if(microPath.length>=1 && r.campaign!==microPath[0]) return false;
+  if(microPath.length>=2 && r.adset!==microPath[1]) return false;
+  if(microPath.length>=3 && r.ad!==microPath[2]) return false;
+  return true; }
+function seriesByDate(rows){ var m={}; rows.forEach(function(r){ if(!isDate(r.date))return; var o=m[r.date]||(m[r.date]={date:r.date,spend:0,leads:0,la:0,clicks:0,impr:0}); o.spend+=r.spend||0;o.leads+=r.leads||0;o.la+=r.la||0;o.clicks+=r.clicks||0;o.impr+=r.impr||0; }); return Object.keys(m).sort().map(function(k){return m[k];}); }
+function avgArr(a){ if(!a.length)return 0; var s=0,i; for(i=0;i<a.length;i++)s+=a[i]; return s/a.length; }
+function microTrend(days,k,hb){
+  var vals=days.map(function(d){return microVal(d,k);}).filter(function(v){return v!=null&&isFinite(v);});
+  if(vals.length<3) return null;
+  var third=Math.max(1,Math.floor(vals.length/3));
+  var fa=avgArr(vals.slice(0,third)), la=avgArr(vals.slice(-third));
+  if(fa===0) return {dir:'flat',chg:0,good:null};
+  var chg=(la-fa)/Math.abs(fa)*100, dir=Math.abs(chg)<5?'flat':(chg>0?'up':'down');
+  var good=(hb===null||dir==='flat')?null:(hb?dir==='up':dir==='down');
+  return {dir:dir,chg:chg,good:good}; }
+function trendBadge(t,big){
+  if(!t) return '<span class="mtrend flat'+(big?' big':'')+'">— série curta</span>';
+  var ico=t.dir==='up'?'📈':(t.dir==='down'?'📉':'➡'), cls=t.good===null?'flat':(t.good?'up':'down');
+  var word=t.dir==='flat'?'estável':(t.dir==='up'?'subindo':'caindo');
+  var pctTxt=Math.abs(t.chg)>300?'&gt;300%':(nf1.format(Math.abs(t.chg))+'%');
+  return '<span class="mtrend '+cls+(big?' big':'')+'">'+ico+' '+word+(t.dir!=='flat'?' '+pctTxt:'')+'</span>'; }
+function tipMicro(d){ var meta=microMeta(microMetric), v=microVal(d,microMetric);
+  return '<div class="tt-d">'+fmtBR(d.date)+'</div>'
+    +'<div class="tt-r"><span>'+meta.lab+'</span><b>'+(v==null?'—':meta.fmt(v))+'</b></div>'
+    +'<div class="tt-sub">Leads '+intf(d.leads)+' · CPL '+(d.leads>0?money(dv(d.spend,d.leads)):'—')+' · Invest. '+money0(d.spend)+'</div>'; }
+function microChart(days,k){
+  if(!el('microChart')) return;
+  var meta=microMeta(k), rgb=microColor(k);
+  var W=820,H=240,pl=46,pr=16,pt=16,pb=26,pw=W-pl-pr,ph=H-pt-pb,base=pt+ph;
+  var maxV=Math.max.apply(null, days.map(function(d){return microVal(d,k);}).filter(function(v){return v!=null&&isFinite(v);}).concat([1]));
+  var n=days.length||1, gw=pw/n, bw=Math.max(3,Math.min(26,gw*0.6));
+  var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
+  [0,0.5,1].forEach(function(f){ var y=pt+ph*(1-f); s+='<line x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'" stroke="#182034" stroke-dasharray="2 3"/>';
+    s+='<text x="'+(pl-5)+'" y="'+(y+3)+'" text-anchor="end" fill="#586a8c" font-size="9">'+meta.fmt(maxV*f)+'</text>'; });
+  days.forEach(function(d,i){ var v=microVal(d,k); if(v==null||!isFinite(v)||v<=0)return; var xc=pl+gw*i+gw/2, h=ph*(v/maxV); s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-h).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="1.5" fill="rgba('+rgb+',.32)"/>'; });
+  var xs=[],ys=[]; days.forEach(function(d,i){ var v=microVal(d,k); if(v!=null&&isFinite(v)){ xs.push(i); ys.push(v); } });
+  if(xs.length>=2){ var nn=xs.length,sx=0,sy=0,sxy=0,sxx=0,j; for(j=0;j<nn;j++){sx+=xs[j];sy+=ys[j];sxy+=xs[j]*ys[j];sxx+=xs[j]*xs[j];}
+    var den=(nn*sxx-sx*sx), m=den!==0?(nn*sxy-sx*sy)/den:0, b=(sy-m*sx)/nn;
+    function yp(val){ return base-ph*(Math.max(0,Math.min(maxV,val))/maxV); }
+    var i0=xs[0], i1=xs[xs.length-1], x0=pl+gw*i0+gw/2, x1=pl+gw*i1+gw/2;
+    s+='<line x1="'+x0.toFixed(1)+'" y1="'+yp(m*i0+b).toFixed(1)+'" x2="'+x1.toFixed(1)+'" y2="'+yp(m*i1+b).toFixed(1)+'" stroke="rgba('+rgb+',.95)" stroke-width="2.5" stroke-dasharray="5 3"/>'; }
+  xticks(days).forEach(function(i){ var xc=pl+gw*i+gw/2; s+='<text x="'+xc.toFixed(1)+'" y="'+(H-7)+'" text-anchor="middle" fill="#586a8c" font-size="9">'+fmtBR(days[i].date)+'</text>'; });
+  s+=hitRects(days,pl,gw,pt,ph)+'</svg>';
+  el('microChart').innerHTML='<div class="chart">'+s+'</div><div class="chart-legend"><span><span class="dot" style="background:rgba('+rgb+',.6)"></span>'+meta.lab+' / dia</span><span><span class="ln" style="background:rgba('+rgb+',.95)"></span>linha de tendência</span></div>';
+  bindHits('microChart', days, tipMicro);
+}
+function mountMicro(){
+  if(!el('microWrap')) return;
+  var rng=microRange();
+  var rows=grain.filter(function(r){ return isDate(r.date)&&inRange(r.date,rng)&&faseMatch(r)&&microMatch(r); });
+  // período próprio
+  var PW=[{k:'7d',l:'7 dias'},{k:'14d',l:'14 dias'},{k:'30d',l:'30 dias'},{k:'tudo',l:'Tudo'}];
+  el('microPeriods').innerHTML='<span class="pf-h">Período:</span>'+PW.map(function(w){return '<button data-k="'+w.k+'" class="pbtn'+(microPeriod===w.k?' on':'')+'">'+w.l+'</button>';}).join('');
+  Array.prototype.forEach.call(el('microPeriods').querySelectorAll('.pbtn'),function(b){ b.addEventListener('click',function(){ microPeriod=b.getAttribute('data-k'); mountMicro(); }); });
+  // seletor de métrica do gráfico
+  el('microMetric').innerHTML='<span class="pf-h">Métrica:</span>'+MICROMETS.map(function(m){return '<button data-m="'+m.k+'" class="pbtn'+(microMetric===m.k?' on':'')+'">'+m.lab+'</button>';}).join('');
+  Array.prototype.forEach.call(el('microMetric').querySelectorAll('.pbtn'),function(b){ b.addEventListener('click',function(){ microMetric=b.getAttribute('data-m'); mountMicro(); }); });
+  // breadcrumb
+  var names=['📊 Todas as campanhas']; if(microPath[0]!=null)names.push(prettyName(microPath[0])); if(microPath[1]!=null)names.push(prettyName(microPath[1])); if(microPath[2]!=null)names.push(prettyName(microPath[2]));
+  el('microCrumb').innerHTML=names.map(function(nm,i){ return i<names.length-1?'<a class="mcrumb" data-d="'+i+'">'+esc(nm)+'</a>':'<span class="mcrumb-cur">'+esc(nm)+'</span>'; }).join(' <span class="mc-sep">›</span> ');
+  Array.prototype.forEach.call(el('microCrumb').querySelectorAll('.mcrumb'),function(a){ a.addEventListener('click',function(){ microPath=microPath.slice(0,+a.getAttribute('data-d')); mountMicro(); }); });
+  // série + gráfico + veredito do nível selecionado
+  var days=seriesByDate(rows), meta=microMeta(microMetric), t=microTrend(days,microMetric,meta.hb);
+  var levelName=microPath.length? prettyName(microPath[microPath.length-1]) : 'toda a captação';
+  el('microVerdict').innerHTML='<div class="mverdict">Tendência de <b>'+meta.lab+'</b> em <b>'+esc(levelName)+'</b> — '+trendBadge(t,true)
+    +' <span class="mv-hint">(compara a média do início vs o fim do período)</span></div>';
+  microChart(days,microMetric);
+  // tabela do próximo nível (filhos)
+  var level=microPath.length, ck=['campaign','adset','ad'][level], drillable=level<2;
+  var lvlLab=['Campanha','Conjunto / Grupo','Anúncio'][level] || 'Anúncio';
+  var tbl='';
+  if(!ck){ tbl='<div class="card"><div class="empty">Nível de anúncio — sem mais drill-down. Veja a tendência acima.</div></div>'; }
+  else {
+    var groups={}; rows.forEach(function(r){ var key=r[ck]; if(key==null)return; var g=groups[key]||(groups[key]={key:key,spend:0,leads:0,la:0,clicks:0,impr:0,rows:[]}); g.spend+=r.spend||0;g.leads+=r.leads||0;g.la+=r.la||0;g.clicks+=r.clicks||0;g.impr+=r.impr||0; g.rows.push(r); });
+    var list=Object.keys(groups).map(function(key){return groups[key];}).sort(function(a,b){return b.leads-a.leads;});
+    var head='<thead><tr><th>'+lvlLab+'</th><th class="num">Invest.</th><th class="num">Leads</th><th class="num">CPL</th><th class="num">Lead A</th><th class="num">Custo Lead A</th><th class="num">Tendência ('+meta.lab+')</th></tr></thead>';
+    var body=list.map(function(g){ var cpl=g.leads>0?dv(g.spend,g.leads):null, cpla=g.la>0?dv(g.spend,g.la):null, gt=microTrend(seriesByDate(g.rows),microMetric,meta.hb);
+      return '<tr class="'+(drillable?'mrow':'')+'" data-key="'+encodeURIComponent(g.key)+'">'
+        +'<td><span class="mname">'+(drillable?'<span class="mcaret">▸</span> ':'')+esc(prettyName(g.key))+'</span></td>'
+        +'<td class="num">'+money0(g.spend)+'</td><td class="num">'+intf(g.leads)+'</td>'
+        +'<td class="num">'+(cpl!=null?money0(cpl):'—')+'</td>'
+        +'<td class="num"><b class="cA">'+intf(g.la)+'</b></td>'
+        +'<td class="num">'+(cpla!=null?money0(cpla):'—')+'</td>'
+        +'<td class="num">'+trendBadge(gt,false)+'</td></tr>'; }).join('');
+    if(!list.length) body='<tr><td colspan="7" class="empty">Sem dados no período.</td></tr>';
+    tbl='<div class="card"><div class="card-h">Detalhe por '+lvlLab+(drillable?' <span class="hint">clique numa linha p/ abrir o próximo nível</span>':' <span class="hint">nível final</span>')+'</div><div class="table-scroll"><table class="tbl" id="microTbl">'+head+'<tbody>'+body+'</tbody></table></div></div>';
+  }
+  el('microTable').innerHTML=tbl;
+  Array.prototype.forEach.call(document.querySelectorAll('#microTable .mrow'),function(tr){ tr.addEventListener('click',function(){ microPath=microPath.concat([decodeURIComponent(tr.getAttribute('data-key'))]); mountMicro(); }); });
+}
+
 /* =================== ACOMPANHAMENTO GERAL (saúde da captação · foco Lead A) =================== */
 var acompWin=7;
 function acompAgg(days){ var o={spend:0,leads:0,la:0,lb:0,lc:0,clicks:0,impr:0};
@@ -822,7 +937,7 @@ function acompWeeks(days){
 }
 function renderAll(){ var rng=rangeFor(period), a=aggDaily(rng), p=aggDaily(prevRange(rng)), days=daysInRange(rng);
   renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderDaily(rng); renderTree(rng); }
-var TABS=['funil','leads','perfil','acomp','engaje'];
+var TABS=['funil','micro','leads','perfil','acomp','engaje'];
 function activateTab(id){ Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(x){x.classList.toggle('active',x.getAttribute('data-tab')===id);});
   TABS.forEach(function(k){ el('tab-'+k).classList.toggle('hidden',k!==id); }); }
 function initTabs(){ Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(t){ t.addEventListener('click',function(){ var id=t.getAttribute('data-tab'); activateTab(id); if(history.replaceState)history.replaceState(null,'','#'+id); }); });
@@ -858,7 +973,8 @@ function switchFunnel(key){
   period='tudo'; customRange=null; channel='geral'; treeInited=false; expanded={};
   updateBranding(); syncFunnelUI(); syncChannelUI();
   profPeriod='tudo'; profSrc=-1; profMed=-1; profCamp=-1; fase='all'; acompWin=7;
-  initFases(); initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp();
+  microPath=[]; microMetric='leads'; microPeriod='tudo';
+  initFases(); initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro();
   if(history.replaceState){ history.replaceState(null,'', location.pathname+'?funnel='+key+(location.hash||'')); }
 }
 function initFunnels(){
@@ -873,5 +989,5 @@ function initFunnels(){
 }
 
 if(!funnels.length || (!daily.length && !grain.length)){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
-else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); }
+else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); }
 })();

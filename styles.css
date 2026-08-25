@@ -373,3 +373,22 @@ b{font-weight:700}
 .ac-val{font-size:26px;font-weight:800;color:var(--ink);margin-top:6px;line-height:1}
 .ac-val .trend{font-size:12px;margin-left:6px}
 .ac-sub{font-size:11.5px;color:var(--muted2);margin-top:6px}
+
+/* ===== Otimização micro (drill-down + tendência) ===== */
+.micro-controls{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center;margin-bottom:10px}
+.micro-mets .pbtn.on{background:var(--vi);border-color:var(--vi);color:#0a0616;box-shadow:0 4px 14px rgba(139,124,240,.3)}
+.micro-crumb{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:13px;margin:2px 0 14px;padding:9px 13px;background:var(--bg2);border:1px solid var(--line);border-radius:10px}
+.micro-crumb .mcrumb{color:var(--cy2);cursor:pointer;font-weight:600;text-decoration:none}
+.micro-crumb .mcrumb:hover{text-decoration:underline}
+.micro-crumb .mcrumb-cur{color:var(--ink);font-weight:700}
+.micro-crumb .mc-sep{color:var(--muted2)}
+.mverdict{font-size:13.5px;color:var(--ink2);margin-bottom:10px}.mverdict .mv-hint{color:var(--muted2);font-size:11.5px;font-weight:500}
+.mtrend{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--panel3);color:var(--muted)}
+.mtrend.up{background:rgba(52,211,153,.16);color:var(--good)}
+.mtrend.down{background:rgba(242,99,126,.16);color:var(--bad)}
+.mtrend.flat{background:var(--panel3);color:var(--muted)}
+.mtrend.big{font-size:14px;padding:5px 13px}
+tr.mrow{cursor:pointer}
+tr.mrow:hover{background:rgba(139,124,240,.08)}
+.mname .mcaret{color:var(--vi2);font-size:11px;margin-right:2px}
+tr.mrow:hover .mcaret{color:var(--cy2)}
