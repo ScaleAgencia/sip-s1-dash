@@ -171,12 +171,12 @@ function tipLeads(d){
     +'<div class="tt-r"><span style="color:'+COL.cy2+'">Leads</span><b>'+intf(d.leads)+'</b></div>';
   if(channel==='geral'){ s+='<div class="tt-r"><span style="color:'+COL.cy+'">Meta</span><b>'+intf(d.mLeads)+'</b></div>'
     +'<div class="tt-r"><span style="color:'+COL.vi2+'">Google</span><b>'+intf(d.gLeads)+'</b></div>'; }
-  return s+'<div class="tt-sub">Investimento '+money0(d.spend)+' · CPL '+(d.leads?money(dv(d.spend,d.leads)):'—')+'</div>'; }
+  return s+'<div class="tt-sub">Investimento <b>'+money0(d.spend)+'</b> · CPL <b>'+(d.leads?money(dv(d.spend,d.leads)):'—')+'</b></div>'; }
 function tipInvest(d){
   return '<div class="tt-d">'+fmtBR(d.date)+'</div>'
     +'<div class="tt-r"><span style="color:'+COL.cy2+'">Investimento</span><b>'+money0(d.spend)+'</b></div>'
     +'<div class="tt-r"><span style="color:'+COL.warn+'">CPL</span><b>'+(d.leads>0?money(dv(d.spend,d.leads)):'—')+'</b></div>'
-    +'<div class="tt-sub">Leads '+intf(d.leads)+' · CPM '+money(dv(d.spend,d.impr)*1000)+'</div>'; }
+    +'<div class="tt-sub">Leads <b>'+intf(d.leads)+'</b> · CPM <b>'+money(dv(d.spend,d.impr)*1000)+'</b></div>'; }
 
 function renderChartLeads(days){
   var W=600,H=210,pl=30,pr=10,pt=12,pb=22,pw=W-pl-pr,ph=H-pt-pb,base=pt+ph;
@@ -778,10 +778,23 @@ function trendBadge(t,big){
   var word=t.dir==='flat'?'estável':(t.dir==='up'?'subindo':'caindo');
   var pctTxt=Math.abs(t.chg)>300?'&gt;300%':(nf1.format(Math.abs(t.chg))+'%');
   return '<span class="mtrend '+cls+(big?' big':'')+'">'+ico+' '+word+(t.dir!=='flat'?' '+pctTxt:'')+'</span>'; }
+// Ação recomendada olhando a TENDÊNCIA de volume de Lead A + custo por Lead A (não a métrica do gráfico)
+function microAction(days){
+  var totLa=0; days.forEach(function(d){ totLa+=d.la||0; });
+  if(totLa<3) return {t:'Dado insuf.',c:'act-ins',why:'poucos Lead A no período p/ concluir'};
+  var vol=microTrend(days,'la',true), cost=microTrend(days,'cpla',false);
+  var vs = vol ? (vol.dir==='up'?1:(vol.dir==='down'?-1:0)) : 0;   // volume Lead A subindo=+1
+  var cs = cost? (cost.dir==='down'?1:(cost.dir==='up'?-1:0)) : 0; // custo Lead A caindo=+1
+  var score=vs+cs;
+  if(score>=1)  return {t:'Acelerar',c:'act-acel',why:'Lead A '+(vs>0?'subindo':'estável')+(cs>0?' e mais barato':(cs<0?' (apesar de mais caro)':''))};
+  if(score<=-1) return {t:'Pausar',  c:'act-rev', why:'Lead A '+(vs<0?'caindo':'estável')+(cs<0?(vs<0?' e mais caro':' ficando mais caro'):'')};
+  return {t:'Manter',c:'act-mant',why:'volume e custo de Lead A estáveis'};
+}
+function actionBadge(a){ return '<span class="act '+a.c+'" title="'+esc(a.why)+'">'+a.t+'</span>'; }
 function tipMicro(d){ var meta=microMeta(microMetric), v=microVal(d,microMetric);
   return '<div class="tt-d">'+fmtBR(d.date)+'</div>'
     +'<div class="tt-r"><span>'+meta.lab+'</span><b>'+(v==null?'—':meta.fmt(v))+'</b></div>'
-    +'<div class="tt-sub">Leads '+intf(d.leads)+' · CPL '+(d.leads>0?money(dv(d.spend,d.leads)):'—')+' · Invest. '+money0(d.spend)+'</div>'; }
+    +'<div class="tt-sub">Leads <b>'+intf(d.leads)+'</b> · CPL <b>'+(d.leads>0?money(dv(d.spend,d.leads)):'—')+'</b> · Invest. <b>'+money0(d.spend)+'</b></div>'; }
 function microChart(days,k){
   if(!el('microChart')) return;
   var meta=microMeta(k), rgb=microColor(k);
@@ -821,8 +834,10 @@ function mountMicro(){
   // série + gráfico + veredito do nível selecionado
   var days=seriesByDate(rows), meta=microMeta(microMetric), t=microTrend(days,microMetric,meta.hb);
   var levelName=microPath.length? prettyName(microPath[microPath.length-1]) : 'toda a captação';
+  var act=microAction(days);
   el('microVerdict').innerHTML='<div class="mverdict">Tendência de <b>'+meta.lab+'</b> em <b>'+esc(levelName)+'</b> — '+trendBadge(t,true)
-    +' <span class="mv-hint">(compara a média do início vs o fim do período)</span></div>';
+    +' <span class="mv-hint">(início vs fim do período)</span></div>'
+    +'<div class="mverdict mv-act">Ação <span class="mv-hint">(por volume + custo de Lead A)</span> — '+actionBadge(act)+' <span class="mv-why">'+esc(act.why)+'</span></div>';
   microChart(days,microMetric);
   // tabela do próximo nível (filhos)
   var level=microPath.length, ck=['campaign','adset','ad'][level], drillable=level<2;
@@ -832,16 +847,17 @@ function mountMicro(){
   else {
     var groups={}; rows.forEach(function(r){ var key=r[ck]; if(key==null)return; var g=groups[key]||(groups[key]={key:key,spend:0,leads:0,la:0,clicks:0,impr:0,rows:[]}); g.spend+=r.spend||0;g.leads+=r.leads||0;g.la+=r.la||0;g.clicks+=r.clicks||0;g.impr+=r.impr||0; g.rows.push(r); });
     var list=Object.keys(groups).map(function(key){return groups[key];}).sort(function(a,b){return b.leads-a.leads;});
-    var head='<thead><tr><th>'+lvlLab+'</th><th class="num">Invest.</th><th class="num">Leads</th><th class="num">CPL</th><th class="num">Lead A</th><th class="num">Custo Lead A</th><th class="num">Tendência ('+meta.lab+')</th></tr></thead>';
-    var body=list.map(function(g){ var cpl=g.leads>0?dv(g.spend,g.leads):null, cpla=g.la>0?dv(g.spend,g.la):null, gt=microTrend(seriesByDate(g.rows),microMetric,meta.hb);
+    var head='<thead><tr><th>'+lvlLab+'</th><th class="num">Invest.</th><th class="num">Leads</th><th class="num">CPL</th><th class="num">Lead A</th><th class="num">Custo Lead A</th><th class="num">Tendência ('+meta.lab+')</th><th class="num">Ação</th></tr></thead>';
+    var body=list.map(function(g){ var cpl=g.leads>0?dv(g.spend,g.leads):null, cpla=g.la>0?dv(g.spend,g.la):null, gd=seriesByDate(g.rows), gt=microTrend(gd,microMetric,meta.hb), ga=microAction(gd);
       return '<tr class="'+(drillable?'mrow':'')+'" data-key="'+encodeURIComponent(g.key)+'">'
         +'<td><span class="mname">'+(drillable?'<span class="mcaret">▸</span> ':'')+esc(prettyName(g.key))+'</span></td>'
         +'<td class="num">'+money0(g.spend)+'</td><td class="num">'+intf(g.leads)+'</td>'
         +'<td class="num">'+(cpl!=null?money0(cpl):'—')+'</td>'
         +'<td class="num"><b class="cA">'+intf(g.la)+'</b></td>'
         +'<td class="num">'+(cpla!=null?money0(cpla):'—')+'</td>'
-        +'<td class="num">'+trendBadge(gt,false)+'</td></tr>'; }).join('');
-    if(!list.length) body='<tr><td colspan="7" class="empty">Sem dados no período.</td></tr>';
+        +'<td class="num">'+trendBadge(gt,false)+'</td>'
+        +'<td class="num">'+actionBadge(ga)+'</td></tr>'; }).join('');
+    if(!list.length) body='<tr><td colspan="8" class="empty">Sem dados no período.</td></tr>';
     tbl='<div class="card"><div class="card-h">Detalhe por '+lvlLab+(drillable?' <span class="hint">clique numa linha p/ abrir o próximo nível</span>':' <span class="hint">nível final</span>')+'</div><div class="table-scroll"><table class="tbl" id="microTbl">'+head+'<tbody>'+body+'</tbody></table></div></div>';
   }
   el('microTable').innerHTML=tbl;
@@ -898,7 +914,7 @@ function tipAcomp(d){
   return '<div class="tt-d">'+fmtBR(d.date)+'</div>'
     +'<div class="tt-r"><span style="color:#34d399">Lead A</span><b>'+intf(d.la||0)+'</b></div>'
     +'<div class="tt-r"><span style="color:'+COL.warn+'">Custo por Lead A</span><b>'+(d.la>0?money(dv(d.spend,d.la)):'—')+'</b></div>'
-    +'<div class="tt-sub">Leads '+intf(d.leads||0)+' · % Lead A '+(q>0?pct(dv(d.la,q)*100):'—')+' · Invest. '+money0(d.spend)+'</div>'; }
+    +'<div class="tt-sub">Leads <b>'+intf(d.leads||0)+'</b> · % Lead A <b>'+(q>0?pct(dv(d.la,q)*100):'—')+'</b> · Invest. <b>'+money0(d.spend)+'</b></div>'; }
 function acompChart(days){
   if(!el('acompChart')) return;
   var d2=days.slice(Math.max(0,days.length-45));
