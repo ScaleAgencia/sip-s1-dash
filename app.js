@@ -627,15 +627,11 @@ function renderProfileCompare(rows, tot){
 
 /* =================== META DE INVESTIMENTO (pacing) =================== */
 function todayISO(){ var d=new Date(),m=d.getMonth()+1,day=d.getDate(); return d.getFullYear()+'-'+(m<10?'0'+m:m)+'-'+(day<10?'0'+day:day); }
-function mountGoal(){
-  var box=el('goalWrap'); if(!box) return;
-  var G=D.goal||{}, goal=+G.spend||0, deadline=G.date||'';
-  if(!(goal>0) || !deadline){ box.innerHTML=''; return; }
-  var spent=totals.spend||0, tISO=todayISO();
+function goalCard(goal, deadline, spent, byDate, titleExtra){
+  var tISO=todayISO();
   var remaining=Math.max(0,goal-spent), pctDone=clamp(goal>0?spent/goal:0);
   var daysLeft = tISO<=deadline ? daysBetween(tISO,deadline)+1 : 0;      // inclui hoje
   var dailyNeeded = daysLeft>0 ? remaining/daysLeft : 0;
-  var byDate={}; daily.forEach(function(d){ if(!isDate(d.date))return; byDate[d.date]=(byDate[d.date]||0)+(d.spend||0); });
   var dts=Object.keys(byDate).sort(), last7=dts.slice(-7);
   var recentAvg = last7.length ? last7.reduce(function(s,k){return s+byDate[k];},0)/last7.length : 0;
   var projected = spent + recentAvg*daysLeft, deltaDaily = dailyNeeded-recentAvg, dl=fmtBR(deadline);
@@ -647,13 +643,14 @@ function mountGoal(){
   var paceNote;
   if(done){ paceNote='Investimento acumulado já alcançou a meta.'; }
   else if(over){ paceNote='Faltaram <b>'+money0(remaining)+'</b> para a meta de '+money0(goal)+'.'; }
+  else if(recentAvg<=0){ paceNote='Ainda sem gasto registrado nesta meta — o alvo é <b class="g-ok">'+money0(dailyNeeded)+'/dia</b> nos próximos <b>'+intf(daysLeft)+'</b> dias p/ chegar aos '+money0(goal)+'.'; }
   else {
     paceNote='No ritmo atual (~<b>'+money0(recentAvg)+'</b>/dia) você chega a <b>'+money0(projected)+'</b> em '+dl+' — '
       +(projected>=goal?'<b class="g-ok">supera a meta</b>.':'<b class="g-bad">'+money0(goal-projected)+' abaixo</b>.')
       +(deltaDaily>1?' Precisa <b class="g-bad">acelerar +'+money0(deltaDaily)+'/dia</b> ('+nf1.format(recentAvg>0?dailyNeeded/recentAvg:0)+'× o ritmo de hoje).':' O ritmo atual já cobre o necessário ✓.');
   }
-  box.innerHTML='<div class="card goalcard">'
-    +'<div class="card-h">🎯 Meta de investimento <span class="hint">R$ '+nf0.format(goal)+' (com impostos) até '+dl+' · o valor/dia se reajusta sozinho a cada dia e a cada atualização</span></div>'
+  return '<div class="card goalcard">'
+    +'<div class="card-h">🎯 Meta de investimento'+(titleExtra||'')+' <span class="hint">R$ '+nf0.format(goal)+' (com impostos) até '+dl+' · o valor/dia se reajusta sozinho a cada dia e a cada atualização</span></div>'
     +'<div class="goal-grid">'
       +'<div class="goal-hero'+(behind&&!done&&!over?' behind':(done?' okdone':''))+'"><div class="gh-val">'+heroVal+'</div><div class="gh-lab">'+heroLab+'</div></div>'
       +'<div class="goal-side">'
@@ -668,6 +665,23 @@ function mountGoal(){
       +'</div>'
     +'</div>'
     +'<div class="goal-note">'+paceNote+'</div></div>';
+}
+function mountGoal(){
+  var box=el('goalWrap'); if(!box) return;
+  var html='';
+  // meta do FUNIL (ex.: L21)
+  var G=D.goal||{}, goal=+G.spend||0, deadline=G.date||'';
+  if(goal>0 && deadline){
+    var bd={}; daily.forEach(function(d){ if(!isDate(d.date))return; bd[d.date]=(bd[d.date]||0)+(d.spend||0); });
+    html+=goalCard(goal, deadline, totals.spend||0, bd, '');
+  }
+  // metas por FASE (ex.: S3 do S1) — sempre visíveis, cada uma com o gasto da sua turma
+  var FG=D.faseGoals||{};
+  Object.keys(FG).forEach(function(fk){ var g=FG[fk]||{}, gs=+g.spend||0, gd=g.date||''; if(!(gs>0)||!gd) return;
+    var bd={}, sp=0; daily.forEach(function(d){ if(d.fase!==fk||!isDate(d.date))return; bd[d.date]=(bd[d.date]||0)+(d.spend||0); sp+=d.spend||0; });
+    html+=goalCard(gs, gd, sp, bd, ' · <span class="cA">'+esc(faseLabel(fk))+'</span>');
+  });
+  box.innerHTML=html;
 }
 
 /* =================== CHROME =================== */

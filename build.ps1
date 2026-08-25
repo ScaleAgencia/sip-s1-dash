@@ -19,7 +19,9 @@ $FUNNELS = @(
   [ordered]@{ key='s1';  label='SIP-S1';
     queriesId='1WKRLwQpK4xcoQENOZPk01qROgbTL9vLqTxyp8sfo_9A'; metaGid='0'; googleGid='1609119011';
     leadsId='1nTJYpjYLlK8ZOfA-V9faNSuqz-oegrhccmOgGvrEzm0';   leadsGid='566747937'
-    goalSpend=0; goalDate='' }
+    goalSpend=0; goalDate=''
+    # metas de investimento POR FASE (tag do lead) · com impostos · chave = tag exata
+    faseGoals=@{ 'SIP-S3'=@{ spend=40000; date='2026-09-06' } } }
   [ordered]@{ key='l21'; label='SIP-L21';
     queriesId='1MzEn8jtxvEQbAWgA1Btg1cL5Q-mB3oA8KygVJfrgszo'; metaGid='0'; googleGid='1609119011';
     # (Google agora consolida TODAS as campanhas numa aba so, gid 1609119011 -> sem abas extras.
@@ -509,6 +511,7 @@ function Build-Funnel($cfg){
     key=$cfg.key; label=$cfg.label; funnel=$cfg.label; leadsOk=$leadsOk
     taxMultiplier=$TAX; taxGoogle=$TAXG
     goal=[pscustomobject]@{ spend=[double]$cfg.goalSpend; date=[string]$cfg.goalDate }
+    faseGoals=$(if($cfg.Contains('faseGoals') -and $cfg.faseGoals){ [pscustomobject]$cfg.faseGoals }else{ [pscustomobject]@{} })
     dateMin=$(if($dates.Count){$dates[0]}else{''}); dateMax=$(if($dates.Count){$dates[-1]}else{''})
     leadDateMin=$(if($leadDates.Count){$leadDates[0]}else{''}); leadDateMax=$(if($leadDates.Count){$leadDates[-1]}else{''})
     totals=$tot; byChannel=@($byChannel); bySource=@($bySource)
