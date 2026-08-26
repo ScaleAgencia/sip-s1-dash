@@ -253,7 +253,7 @@ var treeSort={key:'leads',dir:-1};
 var TREECOLS=[{k:'name',lab:'Campanha › Conjunto/Grupo › Anúncio',cls:''},
   {k:'spend',lab:'Gasto',cls:'num'},{k:'leads',lab:'Leads',cls:'num'},
   {k:'ctr',lab:'CTR',cls:'num'},{k:'cpm',lab:'CPM',cls:'num'},{k:'convp',lab:'Conv. pág.',cls:'num'},
-  {k:'la',lab:'Lead A · B · C',cls:'num'},{k:'cpla',lab:'Custo Lead A',cls:'num'},{k:'convq',lab:'Conv. qualif.',cls:'num'},
+  {k:'la',lab:'Lead A · B · C',cls:'num'},{k:'cpla',lab:'Custo Lead A',cls:'num'},{k:'cplb',lab:'Custo Lead B',cls:'num'},{k:'convq',lab:'Conv. qualif.',cls:'num'},
   {k:null,lab:'Ação',cls:'num'}];
 function treeMetric(n,key){ switch(key){
   case 'spend': return n.spend||0; case 'leads': return n.leads||0;
@@ -263,8 +263,9 @@ function treeMetric(n,key){ switch(key){
   case 'convp': return n.clicks>0 ? n.leads/n.clicks    : -1;
   case 'convq': return n.clicks>0 ? n.la/n.clicks       : -1;
   case 'cpla':  return n.la>0 ? n.spend/n.la : Infinity;   // sem Lead A = "infinitamente caro"
+  case 'cplb':  return n.lb>0 ? n.spend/n.lb : Infinity;
   default: return 0; } }
-function treeDefaultDir(key){ return (key==='cpm'||key==='cpla'||key==='name') ? 1 : -1; } // custos e nome sobem (melhor primeiro), o resto desce
+function treeDefaultDir(key){ return (key==='cpm'||key==='cpla'||key==='cplb'||key==='name') ? 1 : -1; } // custos e nome sobem (melhor primeiro), o resto desce
 function sortLabel(){ var c=null; for(var i=0;i<TREECOLS.length;i++){ if(TREECOLS[i].k===treeSort.key) c=TREECOLS[i]; }
   if(!c) return 'ordenado por leads';
   var better = treeSort.dir===treeDefaultDir(treeSort.key);
@@ -286,8 +287,9 @@ function actTag(n,medA){
 function abcCell(v,cls){ return '<td class="num">'+(v?'<b class="c'+cls+'">'+intf(v)+'</b>':'<span class="muted3">0</span>')+'</td>'; }
 function abcMixCell(n){ return '<td class="num abc-mix"><b class="cA">'+intf(n.la)+'</b><small class="muted3"> · '+intf(n.lb)+' · '+intf(n.lc)+'</small></td>'; }
 function metricsCells(n,medA){
-  var cpla=n.la>0?dv(n.spend,n.la):null, tag=actTag(n,medA);
+  var cpla=n.la>0?dv(n.spend,n.la):null, cplb=n.lb>0?dv(n.spend,n.lb):null, tag=actTag(n,medA);
   var cA  = cpla!=null?'<span class="cpl-pill '+relClass(cpla,medA)+'">'+money0(cpla)+'</span>':'—';
+  var cB  = cplb!=null?'<span class="cpl-plain">'+money0(cplb)+'</span>':'—';
   var ctr = n.impr>0?   pct(dv(n.clicks,n.impr)*100)   : '—';
   var cpm = n.impr>0?   money0(dv(n.spend,n.impr)*1000): '—';
   var cvp = n.clicks>0? pct(dv(n.leads,n.clicks)*100)  : '—';
@@ -299,6 +301,7 @@ function metricsCells(n,medA){
     +'<td class="num">'+cvp+'</td>'
     +abcMixCell(n)
     +'<td class="num">'+cA+'</td>'
+    +'<td class="num">'+cB+'</td>'
     +'<td class="num">'+cvq+'</td>'
     +'<td class="num"><span class="act '+tag.c+'">'+tag.t+'</span></td>'; }
 function treeRow(n,lvl,key,hasKids,medA,medB,medC){
