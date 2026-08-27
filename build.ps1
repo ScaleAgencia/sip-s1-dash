@@ -21,7 +21,7 @@ $FUNNELS = @(
     leadsId='1nTJYpjYLlK8ZOfA-V9faNSuqz-oegrhccmOgGvrEzm0';   leadsGid='566747937'
     goalSpend=0; goalDate=''
     # metas de investimento POR FASE (tag do lead) · com impostos · chave = tag exata
-    faseGoals=@{ 'SIP-S3'=@{ spend=20000; date='2026-09-06' } } }
+    faseGoals=@{ 'SIP-S3'=@{ spend=20000; date='2026-09-07' } } }
   [ordered]@{ key='l21'; label='SIP-L21';
     queriesId='1MzEn8jtxvEQbAWgA1Btg1cL5Q-mB3oA8KygVJfrgszo'; metaGid='0'; googleGid='1609119011';
     # (Google agora consolida TODAS as campanhas numa aba so, gid 1609119011 -> sem abas extras.
