@@ -962,7 +962,40 @@ function acompWeeks(days){
 }
 function renderAll(){ var rng=rangeFor(period), a=aggDaily(rng), p=aggDaily(prevRange(rng)), days=daysInRange(rng);
   renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderDaily(rng); renderTree(rng); }
-var TABS=['funil','micro','leads','perfil','acomp','engaje'];
+var TABS=['funil','micro','leads','perfil','acomp','aquec','engaje'];
+/* ---- Aquecimento (L21) · dados via MCP do Meta Ads (snapshot em aquecimento.js) ---- */
+function mountAquec(){
+  var w=el('aquecWrap'); if(!w) return;
+  var A=window.AQUECIMENTO;
+  if(!A || !A.rows || !A.rows.length){ w.innerHTML='<div class="card"><div class="empty">Sem dados da campanha de aquecimento.</div></div>'; return; }
+  var tSpend=0,tImpr=0,tClicks=0;
+  A.rows.forEach(function(r){ tSpend+=r.spend||0; tImpr+=r.impr||0; tClicks+=r.clicks||0; });
+  var cpmT=tImpr?tSpend/tImpr*1000:0, cpcT=tClicks?tSpend/tClicks:0, ctrT=tImpr?tClicks/tImpr*100:0;
+  var head='<thead><tr><th>Dia</th><th class="num">Alcance</th><th class="num">Frequência</th><th class="num">Impressões</th><th class="num">Cliques</th><th class="num">Gasto</th><th class="num">CPM</th><th class="num">CPC</th><th class="num">CTR</th></tr></thead>';
+  var body=A.rows.slice().sort(function(a,b){return b.date.localeCompare(a.date);}).map(function(r){
+    return '<tr><td>'+fmtBR(r.date)+'</td>'
+      +'<td class="num">'+intf(r.reach)+'</td>'
+      +'<td class="num">'+nf1.format(r.freq)+'</td>'
+      +'<td class="num">'+intf(r.impr)+'</td>'
+      +'<td class="num">'+intf(r.clicks)+'</td>'
+      +'<td class="num">'+money(r.spend)+'</td>'
+      +'<td class="num">'+money(r.cpm)+'</td>'
+      +'<td class="num">'+money(r.cpc)+'</td>'
+      +'<td class="num">'+nf1.format(r.ctr)+'%</td></tr>';
+  }).join('');
+  w.innerHTML='<div class="card">'
+    +'<div class="card-h">🔥 Campanha de Aquecimento · L21 <span class="hint">'+esc(A.account)+' · BM '+esc(A.bm)+' · objetivo TRÁFEGO / remarketing</span></div>'
+    +'<div class="aquec-camp">'+esc(A.campaign)+'</div>'
+    +'<div class="table-scroll"><table class="tbl">'+head+'<tbody>'+body+'</tbody></table></div>'
+    +'<div class="aquec-note"><b>No período:</b> '+money0(tSpend)+' gasto · CPM médio '+money(cpmT)+' · CPC médio '+money(cpcT)+' · CTR médio '+nf1.format(ctrT)+'%.'
+    +'<br><small>Puxado via MCP do Meta Ads (snapshot '+esc(A.updatedAt||'')+'). Como o build automático de 3h lê só as planilhas do Google, esta aba <b>não atualiza sozinha</b> — peça um refresh que eu re-puxo do Meta e regravo.</small></div>'
+    +'</div>';
+}
+function syncL21Tabs(){
+  var show=(funKey==='l21');
+  Array.prototype.forEach.call(document.querySelectorAll('.tab-l21only'),function(b){ b.style.display=show?'':'none'; });
+  if(!show){ var act=document.querySelector('.tab.active'); if(act && act.getAttribute('data-tab')==='aquec'){ activateTab('funil'); if(history.replaceState)history.replaceState(null,'','#funil'); } }
+}
 function activateTab(id){ Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(x){x.classList.toggle('active',x.getAttribute('data-tab')===id);});
   TABS.forEach(function(k){ el('tab-'+k).classList.toggle('hidden',k!==id); }); }
 function initTabs(){ Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(t){ t.addEventListener('click',function(){ var id=t.getAttribute('data-tab'); activateTab(id); if(history.replaceState)history.replaceState(null,'','#'+id); }); });
@@ -999,7 +1032,7 @@ function switchFunnel(key){
   updateBranding(); syncFunnelUI(); syncChannelUI();
   profPeriod='tudo'; profSrc=-1; profMed=-1; profCamp=-1; fase='all'; acompWin=7;
   microPath=[]; microMetric='leads'; microPeriod='tudo';
-  initFases(); initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro();
+  initFases(); initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountAquec(); syncL21Tabs();
   if(history.replaceState){ history.replaceState(null,'', location.pathname+'?funnel='+key+(location.hash||'')); }
 }
 function initFunnels(){
@@ -1014,5 +1047,5 @@ function initFunnels(){
 }
 
 if(!funnels.length || (!daily.length && !grain.length)){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
-else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); }
+else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountAquec(); syncL21Tabs(); }
 })();

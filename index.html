@@ -50,6 +50,7 @@
     <button class="tab" data-tab="leads">Leads · Visão Geral</button>
     <button class="tab" data-tab="perfil">Perfil do Lead</button>
     <button class="tab" data-tab="acomp">Acompanhamento geral</button>
+    <button class="tab tab-l21only" data-tab="aquec" style="display:none">🔥 Aquecimento</button>
     <button class="tab" data-tab="engaje">Pesquisa &amp; Grupos</button>
   </nav>
 
@@ -164,6 +165,11 @@
     </div>
   </section>
 
+  <!-- ============ AQUECIMENTO (L21 · via MCP Meta Ads) ============ -->
+  <section class="panel-tab hidden" id="tab-aquec">
+    <div id="aquecWrap"></div>
+  </section>
+
   <!-- ============ ACOMPANHAMENTO GERAL ============ -->
   <section class="panel-tab hidden" id="tab-acomp">
     <div class="prof-periods" id="acompWin"></div>
@@ -207,6 +213,7 @@
 </div>
 
 <script>document.write('<script src="data.js?t='+Date.now()+'"><\/script>');</script>
+<script>document.write('<script src="aquecimento.js?t='+Date.now()+'"><\/script>');</script>
 <script>document.write('<script src="app.js?t='+Date.now()+'"><\/script>');</script>
 </body>
 </html>
