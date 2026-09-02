@@ -251,8 +251,8 @@ var expanded={}, treeInited=false;
 /* ordenação da árvore de otimização (clique no cabeçalho) · dir -1=maior→menor, 1=menor→maior */
 var treeSort={key:'leads',dir:-1};
 var TREECOLS=[{k:'name',lab:'Campanha › Conjunto/Grupo › Anúncio',cls:''},
-  {k:'spend',lab:'Gasto',cls:'num'},{k:'leads',lab:'Leads',cls:'num'},
-  {k:'ctr',lab:'CTR',cls:'num'},{k:'cpm',lab:'CPM',cls:'num'},{k:'convp',lab:'Conv. pág.',cls:'num'},
+  {k:'spend',lab:'Gasto',cls:'num'},{k:'leads',lab:'Leads',cls:'num'},{k:'cpl',lab:'CPL',cls:'num'},
+  {k:'ctr',lab:'CTR',cls:'num'},{k:'cpm',lab:'CPM',cls:'num'},{k:'cpc',lab:'CPC',cls:'num'},{k:'convp',lab:'Conv. pág.',cls:'num'},
   {k:'la',lab:'Lead A · B · C',cls:'num'},{k:'cpla',lab:'Custo Lead A',cls:'num'},{k:'cplb',lab:'Custo Lead B',cls:'num'},{k:'convq',lab:'Conv. qualif.',cls:'num'},
   {k:null,lab:'Ação',cls:'num'}];
 function treeMetric(n,key){ switch(key){
@@ -264,8 +264,10 @@ function treeMetric(n,key){ switch(key){
   case 'convq': return n.clicks>0 ? n.la/n.clicks       : -1;
   case 'cpla':  return n.la>0 ? n.spend/n.la : Infinity;   // sem Lead A = "infinitamente caro"
   case 'cplb':  return n.lb>0 ? n.spend/n.lb : Infinity;
+  case 'cpl':   return n.leads>0  ? n.spend/n.leads  : Infinity;
+  case 'cpc':   return n.clicks>0 ? n.spend/n.clicks : Infinity;
   default: return 0; } }
-function treeDefaultDir(key){ return (key==='cpm'||key==='cpla'||key==='cplb'||key==='name') ? 1 : -1; } // custos e nome sobem (melhor primeiro), o resto desce
+function treeDefaultDir(key){ return (key==='cpm'||key==='cpc'||key==='cpl'||key==='cpla'||key==='cplb'||key==='name') ? 1 : -1; } // custos e nome sobem (melhor primeiro), o resto desce
 function sortLabel(){ var c=null; for(var i=0;i<TREECOLS.length;i++){ if(TREECOLS[i].k===treeSort.key) c=TREECOLS[i]; }
   if(!c) return 'ordenado por leads';
   var better = treeSort.dir===treeDefaultDir(treeSort.key);
@@ -292,12 +294,16 @@ function metricsCells(n,medA){
   var cB  = cplb!=null?'<span class="cpl-plain">'+money0(cplb)+'</span>':'—';
   var ctr = n.impr>0?   pct(dv(n.clicks,n.impr)*100)   : '—';
   var cpm = n.impr>0?   money0(dv(n.spend,n.impr)*1000): '—';
+  var cpc = n.clicks>0? money(dv(n.spend,n.clicks))    : '—';
+  var cpl = n.leads>0?  money0(dv(n.spend,n.leads))    : '—';
   var cvp = n.clicks>0? pct(dv(n.leads,n.clicks)*100)  : '—';
   var cvq = n.clicks>0? pct(dv(n.la,n.clicks)*100)     : '—';
   return '<td class="num">'+money0(n.spend)+'</td>'
     +'<td class="num">'+intf(n.leads)+'</td>'
+    +'<td class="num">'+cpl+'</td>'
     +'<td class="num">'+ctr+'</td>'
     +'<td class="num">'+cpm+'</td>'
+    +'<td class="num">'+cpc+'</td>'
     +'<td class="num">'+cvp+'</td>'
     +abcMixCell(n)
     +'<td class="num">'+cA+'</td>'
