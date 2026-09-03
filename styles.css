@@ -352,6 +352,8 @@ b{font-weight:700}
 .qnote b{color:var(--ink2)} .qnote b.qnum{color:var(--gold2)}
 
 /* Qualidade da captação (L21) */
+.qual-period-note{display:block;font-size:13px;color:var(--ink2);background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:9px 13px;margin:2px 0 14px}
+.qual-period-note b{color:var(--cy2)}.qual-period-note small{color:var(--muted2);font-weight:500}
 .qualcard{background:linear-gradient(180deg,var(--panel2),var(--panel))}
 .qual-hero{display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin-bottom:16px}
 .qual-hero .gauge .g-val{font-size:34px}.qual-hero .gauge .g-lab{font-size:12px}

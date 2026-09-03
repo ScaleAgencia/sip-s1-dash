@@ -1009,9 +1009,9 @@ function qualDim(cfg,curTxt,sc,hint){ var c=qualColor(sc);
     +'<div class="qd-hint">'+hint+'</div></div>'; }
 function mountQualidade(){
   if(!el('qualWrap')) return;
-  el('qualPeriods').innerHTML=PRESETS.map(function(pp){return '<button data-k="'+pp.k+'" class="pbtn'+(qualPeriod===pp.k?' on':'')+'">'+pp.label+'</button>';}).join('');
-  Array.prototype.forEach.call(el('qualPeriods').querySelectorAll('.pbtn'),function(b){ b.addEventListener('click',function(){ qualPeriod=b.getAttribute('data-k'); mountQualidade(); }); });
-  var d=qualData(profRangeFor(qualPeriod));
+  var rng=rangeFor(period);
+  el('qualPeriods').innerHTML='<span class="qual-period-note">📅 Período analisado: <b>'+fmtBR(rng[0])+' → '+fmtBR(rng[1])+'</b> <small>— use o filtro de data no topo da página; a nota acompanha o período selecionado, pra você ver se está melhorando.</small></span>';
+  var d=qualData(rng);
   var col=qualColor(d.overall), lab=d.overall>=75?'SAUDÁVEL':(d.overall>=50?'ATENÇÃO':'CRÍTICO');
   var hero='<div class="qual-hero">'+donut(d.overall/100,col,Math.round(d.overall)+'%','qualidade',176)
     +'<div class="qual-hero-txt"><div class="qual-badge" style="background:'+col+'">'+lab+'</div>'
@@ -1033,7 +1033,7 @@ function mountQualidade(){
     +'<div class="card"><div class="card-h">🎯 Como chegar a 100% <span class="hint">o que ajustar, do que mais move o ponteiro pro que menos</span></div>'+ins+'</div>';
 }
 function renderAll(){ var rng=rangeFor(period), a=aggDaily(rng), p=aggDaily(prevRange(rng)), days=daysInRange(rng);
-  renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderHotCold(hotColdByDate(rng)); renderDaily(rng); renderTree(rng);
+  renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderHotCold(hotColdByDate(rng)); renderDaily(rng); renderTree(rng); mountQualidade();
   var hc=el('hotColdCard'); if(hc) hc.style.display=(funKey==='l21')?'':'none'; }
 var TABS=['funil','micro','leads','perfil','acomp','qualidade','aquec','engaje'];
 /* ---- Aquecimento (L21) · dados via MCP do Meta Ads (snapshot em aquecimento.js) ---- */
