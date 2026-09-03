@@ -27,7 +27,7 @@ $FUNNELS = @(
     # (Google agora consolida TODAS as campanhas numa aba so, gid 1609119011 -> sem abas extras.
     #  o campo googleGids2 continua suportado no codigo p/ uso futuro, mas fica vazio aqui.)
     leadsId='19vondd8YlTF4f-nhu3guZAocwqrJz0ofEplbAYEbp5s';   leadsGid='1648797035'
-    goalSpend=380000; goalDate='2026-09-14' }   # meta de investimento c/ imposto ate 14/09
+    goalSpend=350000; goalDate='2026-09-14' }   # meta de investimento c/ imposto ate 14/09
 )
 $TAX  = 1.1385          # imposto Meta (+13,85%) aplicado no gasto do Meta
 $TAXG = 1.0             # Google Ads NAO tem imposto
