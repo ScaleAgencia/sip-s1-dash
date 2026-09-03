@@ -960,9 +960,82 @@ function acompWeeks(days){
   if(!rows.length) body='<tr><td colspan="6" class="empty">Sem dados.</td></tr>';
   el('acompWeeks').innerHTML=head+'<tbody>'+body+'</tbody>';
 }
+/* =================== QUENTE x FRIO (investimento/dia) =================== */
+function isQuente(c){ return /QUENTE|RMKT|AQC|AQUEC/i.test(c||''); }
+function hotColdByDate(rng){ var m={};
+  grain.forEach(function(r){ if(!isDate(r.date)||!inRange(r.date,rng)||!chMatch(r)||!faseMatch(r)) return;
+    var o=m[r.date]||(m[r.date]={date:r.date,quente:0,frio:0});
+    if(isQuente(r.campaign)) o.quente+=r.spend||0; else o.frio+=r.spend||0; });
+  return Object.keys(m).sort().map(function(k){return m[k];}); }
+var HOTC={q:'#f2764e', f:'#38bdf8'};
+function renderHotCold(days){
+  if(!el('chartHotCold')) return;
+  var W=760,H=210,pl=34,pr=10,pt=14,pb=24,pw=W-pl-pr,ph=H-pt-pb,base=pt+ph;
+  var n=days.length||1,gw=pw/n,bw=Math.max(4,Math.min(30,gw*0.62));
+  var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
+  [0,0.5,1].forEach(function(f){ var y=pt+ph*(1-f); s+='<line x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'" stroke="#182034" stroke-dasharray="2 3"/>'; s+='<text x="'+(pl-4)+'" y="'+(y+3)+'" text-anchor="end" fill="#586a8c" font-size="9">'+Math.round(f*100)+'%</text>'; });
+  days.forEach(function(d,i){ var t=(d.quente||0)+(d.frio||0); if(t<=0)return; var xc=pl+gw*i+gw/2;
+    var hf=ph*(d.frio/t), hq=ph*(d.quente/t);
+    s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-hf).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+hf.toFixed(1)+'" fill="'+HOTC.f+'"/>';
+    s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-hf-hq).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+hq.toFixed(1)+'" fill="'+HOTC.q+'"/>'; });
+  xticks(days).forEach(function(i){ var xc=pl+gw*i+gw/2; s+='<text x="'+xc.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" fill="#586a8c" font-size="9">'+fmtBR(days[i].date)+'</text>'; });
+  s+=hitRects(days,pl,gw,pt,ph)+'</svg>';
+  el('chartHotCold').innerHTML='<div class="chart">'+s+'</div><div class="chart-legend"><span><span class="dot" style="background:'+HOTC.q+'"></span>Público quente</span><span><span class="dot" style="background:'+HOTC.f+'"></span>Público frio</span></div>';
+  bindHits('chartHotCold', days, function(d){ var t=(d.quente||0)+(d.frio||0);
+    return '<div class="tt-d">'+fmtBR(d.date)+' · '+money0(t)+'</div>'
+      +'<div class="tt-r"><span style="color:'+HOTC.q+'">Quente</span><b>'+money0(d.quente)+' · '+(t?pct(d.quente/t*100):'—')+'</b></div>'
+      +'<div class="tt-r"><span style="color:'+HOTC.f+'">Frio</span><b>'+money0(d.frio)+' · '+(t?pct(d.frio/t*100):'—')+'</b></div>'; });
+}
+/* =================== QUALIDADE DA CAPTAÇÃO (0-100 · L21) =================== */
+var qualPeriod='tudo';
+var QUALCFG={ a:{lab:'Leadscoring A', tgt:40, w:0.40}, q:{lab:'Público quente', tgt:50, w:0.30}, g:{lab:'Investimento no Google', tgt:50, w:0.30} };
+function qualData(rng){
+  var la=0,lb=0,lc=0,paidLeads=0,quenteLeads=0,gS=0,mS=0,totS=0;
+  grain.forEach(function(r){ if(!isDate(r.date)||!inRange(r.date,rng)||!faseMatch(r)) return;
+    la+=r.la||0; lb+=r.lb||0; lc+=r.lc||0; paidLeads+=r.leads||0;
+    if(isQuente(r.campaign)) quenteLeads+=r.leads||0;
+    totS+=r.spend||0; if(r.channel==='google') gS+=r.spend||0; else mS+=r.spend||0; });
+  var resp=la+lb+lc;
+  var pctA=resp?la/resp*100:0, pctQ=paidLeads?quenteLeads/paidLeads*100:0, pctG=totS?gS/totS*100:0;
+  var sa=clamp(pctA/QUALCFG.a.tgt)*100, sq=clamp(pctQ/QUALCFG.q.tgt)*100, sg=clamp(pctG/QUALCFG.g.tgt)*100;
+  var overall=QUALCFG.a.w*sa+QUALCFG.q.w*sq+QUALCFG.g.w*sg;
+  return {la:la,lb:lb,lc:lc,resp:resp,paidLeads:paidLeads,quenteLeads:quenteLeads,gS:gS,mS:mS,totS:totS,pctA:pctA,pctQ:pctQ,pctG:pctG,sa:sa,sq:sq,sg:sg,overall:overall};
+}
+function qualColor(v){ return v>=75?'#34d399':(v>=50?'#f5b041':'#f2637e'); }
+function qualDim(cfg,curTxt,sc,hint){ var c=qualColor(sc);
+  return '<div class="qd-card"><div class="qd-h"><span class="qd-name">'+cfg.lab+'</span><span class="qd-sc" style="color:'+c+'">'+Math.round(sc)+'<small>/100</small></span></div>'
+    +'<div class="qd-val">'+curTxt+'</div>'
+    +'<div class="qd-track"><span style="width:'+Math.round(clamp(sc/100)*100)+'%;background:'+c+'"></span></div>'
+    +'<div class="qd-hint">'+hint+'</div></div>'; }
+function mountQualidade(){
+  if(!el('qualWrap')) return;
+  el('qualPeriods').innerHTML=PRESETS.map(function(pp){return '<button data-k="'+pp.k+'" class="pbtn'+(qualPeriod===pp.k?' on':'')+'">'+pp.label+'</button>';}).join('');
+  Array.prototype.forEach.call(el('qualPeriods').querySelectorAll('.pbtn'),function(b){ b.addEventListener('click',function(){ qualPeriod=b.getAttribute('data-k'); mountQualidade(); }); });
+  var d=qualData(profRangeFor(qualPeriod));
+  var col=qualColor(d.overall), lab=d.overall>=75?'SAUDÁVEL':(d.overall>=50?'ATENÇÃO':'CRÍTICO');
+  var hero='<div class="qual-hero">'+donut(d.overall/100,col,Math.round(d.overall)+'%','qualidade',176)
+    +'<div class="qual-hero-txt"><div class="qual-badge" style="background:'+col+'">'+lab+'</div>'
+    +'<div class="qual-sub">Nota de <b>0 a 100</b> da captação do L21 — cruzando <b class="qA">Leadscoring A</b>, <b class="qQ">público quente</b> e <b class="qG">investimento no Google</b> (onde a conversão é maior).</div></div></div>';
+  var cards='<div class="qd-grid">'
+    + qualDim(QUALCFG.a, nf1.format(d.pctA)+'% Lead A <small>(entre respondentes) · meta '+QUALCFG.a.tgt+'%</small>', d.sa, 'Quanto mais leads viram Lead A (perfil comprador), melhor.')
+    + qualDim(QUALCFG.q, nf1.format(d.pctQ)+'% dos leads pagos <small>· meta '+QUALCFG.q.tgt+'%</small>', d.sq, 'Fatia de leads vinda de campanhas quentes / remarketing.')
+    + qualDim(QUALCFG.g, nf1.format(d.pctG)+'% do investimento <small>· meta '+QUALCFG.g.tgt+'%</small>', d.sg, 'O Google converte melhor — priorizar verba lá.')
+    + '</div>';
+  var gaps=[
+    {gap:QUALCFG.a.w*(100-d.sa), a:'<b>Leadscoring A</b>: acelere criativos/campanhas que trazem Lead A barato (veja a aba <b>Otimização micro</b>). Hoje '+nf1.format(d.pctA)+'% dos respondentes são Lead A, meta '+QUALCFG.a.tgt+'%.'},
+    {gap:QUALCFG.q.w*(100-d.sq), a:'<b>Público quente</b>: suba mais verba em campanhas quentes / remarketing. Hoje só '+nf1.format(d.pctQ)+'% dos leads pagos vêm de público quente, meta '+QUALCFG.q.tgt+'%.'},
+    {gap:QUALCFG.g.w*(100-d.sg), a:'<b>Google</b>: migre mais investimento pro Google (converte melhor). Hoje '+nf1.format(d.pctG)+'% do gasto está no Google, meta '+QUALCFG.g.tgt+'%.'}
+  ].filter(function(g){return g.gap>0.5;}).sort(function(x,y){return y.gap-x.gap;});
+  var ins = d.overall>=97 ? '<div class="qual-note ok">Captação no topo — mantenha o mix atual. 🎉</div>'
+    : '<div class="qual-note">Priorize nesta ordem (maior ganho de pontos primeiro):</div><ol class="qual-steps">'
+      + gaps.map(function(g){ return '<li><span class="qstep-pts">+'+Math.round(g.gap)+' pts</span> '+g.a+'</li>'; }).join('') + '</ol>';
+  el('qualWrap').innerHTML='<div class="card qualcard">'+hero+cards+'</div>'
+    +'<div class="card"><div class="card-h">🎯 Como chegar a 100% <span class="hint">o que ajustar, do que mais move o ponteiro pro que menos</span></div>'+ins+'</div>';
+}
 function renderAll(){ var rng=rangeFor(period), a=aggDaily(rng), p=aggDaily(prevRange(rng)), days=daysInRange(rng);
-  renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderDaily(rng); renderTree(rng); }
-var TABS=['funil','micro','leads','perfil','acomp','aquec','engaje'];
+  renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderHotCold(hotColdByDate(rng)); renderDaily(rng); renderTree(rng);
+  var hc=el('hotColdCard'); if(hc) hc.style.display=(funKey==='l21')?'':'none'; }
+var TABS=['funil','micro','leads','perfil','acomp','qualidade','aquec','engaje'];
 /* ---- Aquecimento (L21) · dados via MCP do Meta Ads (snapshot em aquecimento.js) ---- */
 function mountAquec(){
   var w=el('aquecWrap'); if(!w) return;
@@ -994,7 +1067,7 @@ function mountAquec(){
 function syncL21Tabs(){
   var show=(funKey==='l21');
   Array.prototype.forEach.call(document.querySelectorAll('.tab-l21only'),function(b){ b.style.display=show?'':'none'; });
-  if(!show){ var act=document.querySelector('.tab.active'); if(act && act.getAttribute('data-tab')==='aquec'){ activateTab('funil'); if(history.replaceState)history.replaceState(null,'','#funil'); } }
+  if(!show){ var act=document.querySelector('.tab.active'); if(act && act.classList.contains('tab-l21only')){ activateTab('funil'); if(history.replaceState)history.replaceState(null,'','#funil'); } }
 }
 function activateTab(id){ Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(x){x.classList.toggle('active',x.getAttribute('data-tab')===id);});
   TABS.forEach(function(k){ el('tab-'+k).classList.toggle('hidden',k!==id); }); }
@@ -1032,7 +1105,8 @@ function switchFunnel(key){
   updateBranding(); syncFunnelUI(); syncChannelUI();
   profPeriod='tudo'; profSrc=-1; profMed=-1; profCamp=-1; fase='all'; acompWin=7;
   microPath=[]; microMetric='leads'; microPeriod='tudo';
-  initFases(); initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountAquec(); syncL21Tabs();
+  qualPeriod='tudo';
+  initFases(); initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountAquec(); mountQualidade(); syncL21Tabs();
   if(history.replaceState){ history.replaceState(null,'', location.pathname+'?funnel='+key+(location.hash||'')); }
 }
 function initFunnels(){
@@ -1047,5 +1121,5 @@ function initFunnels(){
 }
 
 if(!funnels.length || (!daily.length && !grain.length)){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
-else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountAquec(); syncL21Tabs(); }
+else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountAquec(); mountQualidade(); syncL21Tabs(); }
 })();

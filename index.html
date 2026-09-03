@@ -50,6 +50,7 @@
     <button class="tab" data-tab="leads">Leads · Visão Geral</button>
     <button class="tab" data-tab="perfil">Perfil do Lead</button>
     <button class="tab" data-tab="acomp">Acompanhamento geral</button>
+    <button class="tab tab-l21only" data-tab="qualidade" style="display:none">⭐ Qualidade da Captação</button>
     <button class="tab tab-l21only" data-tab="aquec" style="display:none">🔥 Aquecimento</button>
     <button class="tab" data-tab="engaje">Pesquisa &amp; Grupos</button>
   </nav>
@@ -63,6 +64,7 @@
       <div class="chart-col">
         <div class="card"><div class="card-h">Leads por dia <span class="hint">barras = leads captados · <b>ciano</b> pago · <b>violeta</b> orgânico</span></div><div id="chartLeads"></div></div>
         <div class="card"><div class="card-h">Investimento x CPL por dia <span class="hint">barras = gasto c/ imposto · linha = custo por lead</span></div><div id="chartInvest"></div></div>
+        <div class="card" id="hotColdCard"><div class="card-h">Investimento por dia · público quente x frio <span class="hint">% do gasto/dia · <b style="color:#f2764e">quente</b> (remarketing/RMKT/QUENTE) · <b style="color:#38bdf8">frio</b> (prospecção/FRIO/lookalike)</span></div><div id="chartHotCold"></div></div>
       </div>
     </div>
 
@@ -163,6 +165,12 @@
       </div>
       <div id="microTable"></div>
     </div>
+  </section>
+
+  <!-- ============ QUALIDADE DA CAPTAÇÃO (L21) ============ -->
+  <section class="panel-tab hidden" id="tab-qualidade">
+    <div class="prof-periods" id="qualPeriods"></div>
+    <div id="qualWrap"></div>
   </section>
 
   <!-- ============ AQUECIMENTO (L21 · via MCP Meta Ads) ============ -->
