@@ -988,7 +988,7 @@ function renderHotCold(days){
 }
 /* =================== QUALIDADE DA CAPTAÇÃO (0-100 · L21) =================== */
 var qualPeriod='tudo';
-var QUALCFG={ a:{lab:'Leadscoring A', tgt:40, w:0.40}, q:{lab:'Público quente', tgt:50, w:0.30}, g:{lab:'Investimento no Google', tgt:50, w:0.30} };
+var QUALCFG={ a:{lab:'Leadscoring A', tgt:40, w:1/3}, q:{lab:'Público quente', tgt:50, w:1/3}, g:{lab:'Investimento no Google', tgt:50, w:1/3} };  // os 3 pesam IGUAL (1/3 cada)
 function qualData(rng){
   var la=0,lb=0,lc=0,paidLeads=0,quenteLeads=0,gS=0,mS=0,totS=0;
   grain.forEach(function(r){ if(!isDate(r.date)||!inRange(r.date,rng)||!faseMatch(r)) return;
@@ -998,7 +998,7 @@ function qualData(rng){
   var resp=la+lb+lc;
   var pctA=resp?la/resp*100:0, pctQ=paidLeads?quenteLeads/paidLeads*100:0, pctG=totS?gS/totS*100:0;
   var sa=clamp(pctA/QUALCFG.a.tgt)*100, sq=clamp(pctQ/QUALCFG.q.tgt)*100, sg=clamp(pctG/QUALCFG.g.tgt)*100;
-  var overall=QUALCFG.a.w*sa+QUALCFG.q.w*sq+QUALCFG.g.w*sg;
+  var overall=(sa+sq+sg)/3;   // média dos 3 (peso igual)
   return {la:la,lb:lb,lc:lc,resp:resp,paidLeads:paidLeads,quenteLeads:quenteLeads,gS:gS,mS:mS,totS:totS,pctA:pctA,pctQ:pctQ,pctG:pctG,sa:sa,sq:sq,sg:sg,overall:overall};
 }
 function qualColor(v){ return v>=75?'#34d399':(v>=50?'#f5b041':'#f2637e'); }
@@ -1015,7 +1015,7 @@ function mountQualidade(){
   var col=qualColor(d.overall), lab=d.overall>=75?'SAUDÁVEL':(d.overall>=50?'ATENÇÃO':'CRÍTICO');
   var hero='<div class="qual-hero">'+donut(d.overall/100,col,Math.round(d.overall)+'%','qualidade',176)
     +'<div class="qual-hero-txt"><div class="qual-badge" style="background:'+col+'">'+lab+'</div>'
-    +'<div class="qual-sub">Nota de <b>0 a 100</b> da captação do L21 — cruzando <b class="qA">Leadscoring A</b>, <b class="qQ">público quente</b> e <b class="qG">investimento no Google</b> (onde a conversão é maior).</div></div></div>';
+    +'<div class="qual-sub">Nota de <b>0 a 100</b> da captação do L21 — <b>média (peso igual, 1/3 cada)</b> de <b class="qA">Leadscoring A</b>, <b class="qQ">público quente</b> e <b class="qG">investimento no Google</b> (onde a conversão é maior).</div></div></div>';
   var cards='<div class="qd-grid">'
     + qualDim(QUALCFG.a, nf1.format(d.pctA)+'% Lead A <small>(entre respondentes) · meta '+QUALCFG.a.tgt+'%</small>', d.sa, 'Quanto mais leads viram Lead A (perfil comprador), melhor.')
     + qualDim(QUALCFG.q, nf1.format(d.pctQ)+'% dos leads pagos <small>· meta '+QUALCFG.q.tgt+'%</small>', d.sq, 'Fatia de leads vinda de campanhas quentes / remarketing.')
