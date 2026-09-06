@@ -636,7 +636,7 @@ function renderProfileCompare(rows, tot){
 
 /* =================== META DE INVESTIMENTO (pacing) =================== */
 function todayISO(){ var d=new Date(),m=d.getMonth()+1,day=d.getDate(); return d.getFullYear()+'-'+(m<10?'0'+m:m)+'-'+(day<10?'0'+day:day); }
-function goalCard(goal, deadline, spent, byDate, titleExtra){
+function goalCard(goal, deadline, spent, byDate, titleExtra, spendNote){ spendNote=spendNote||'com impostos';
   var tISO=todayISO();
   var remaining=Math.max(0,goal-spent), pctDone=clamp(goal>0?spent/goal:0);
   var daysLeft = tISO<=deadline ? daysBetween(tISO,deadline)+1 : 0;      // inclui hoje
@@ -659,7 +659,7 @@ function goalCard(goal, deadline, spent, byDate, titleExtra){
       +(deltaDaily>1?' Precisa <b class="g-bad">acelerar +'+money0(deltaDaily)+'/dia</b> ('+nf1.format(recentAvg>0?dailyNeeded/recentAvg:0)+'× o ritmo de hoje).':' O ritmo atual já cobre o necessário ✓.');
   }
   return '<div class="card goalcard">'
-    +'<div class="card-h">🎯 Meta de investimento'+(titleExtra||'')+' <span class="hint">R$ '+nf0.format(goal)+' (com impostos) até '+dl+' · o valor/dia se reajusta sozinho a cada dia e a cada atualização</span></div>'
+    +'<div class="card-h">🎯 Meta de investimento'+(titleExtra||'')+' <span class="hint">R$ '+nf0.format(goal)+' ('+spendNote+') até '+dl+' · o valor/dia se reajusta sozinho a cada dia e a cada atualização</span></div>'
     +'<div class="goal-grid">'
       +'<div class="goal-hero'+(behind&&!done&&!over?' behind':(done?' okdone':''))+'"><div class="gh-val">'+heroVal+'</div><div class="gh-lab">'+heroLab+'</div></div>'
       +'<div class="goal-side">'
@@ -1044,6 +1044,12 @@ function mountAquec(){
   var tSpend=0,tImpr=0,tClicks=0;
   A.rows.forEach(function(r){ tSpend+=r.spend||0; tImpr+=r.impr||0; tClicks+=r.clicks||0; });
   var cpmT=tImpr?tSpend/tImpr*1000:0, cpcT=tClicks?tSpend/tClicks:0, ctrT=tImpr?tClicks/tImpr*100:0;
+  // meta de investimento do aquecimento (mesmo card de pacing do funil)
+  var goalHTML='';
+  if(A.goal && (+A.goal.spend>0) && A.goal.date){
+    var bd={}; A.rows.forEach(function(r){ if(r.date&&r.spend){ bd[r.date]=(bd[r.date]||0)+r.spend; } });
+    goalHTML=goalCard(+A.goal.spend, A.goal.date, tSpend, bd, ' · Aquecimento L21', 'gasto Meta, sem imposto');
+  }
   var head='<thead><tr><th>Dia</th><th class="num">Alcance</th><th class="num">Frequência</th><th class="num">Impressões</th><th class="num">Cliques</th><th class="num">Gasto</th><th class="num">CPM</th><th class="num">CPC</th><th class="num">CTR</th></tr></thead>';
   var body=A.rows.slice().sort(function(a,b){return b.date.localeCompare(a.date);}).map(function(r){
     return '<tr><td>'+fmtBR(r.date)+'</td>'
@@ -1056,7 +1062,7 @@ function mountAquec(){
       +'<td class="num">'+money(r.cpc)+'</td>'
       +'<td class="num">'+nf1.format(r.ctr)+'%</td></tr>';
   }).join('');
-  w.innerHTML='<div class="card">'
+  w.innerHTML=goalHTML+'<div class="card">'
     +'<div class="card-h">🔥 Campanha de Aquecimento · L21 <span class="hint">'+esc(A.account)+' · BM '+esc(A.bm)+' · objetivo TRÁFEGO / remarketing</span></div>'
     +'<div class="aquec-camp">'+esc(A.campaign)+'</div>'
     +'<div class="table-scroll"><table class="tbl">'+head+'<tbody>'+body+'</tbody></table></div>'
