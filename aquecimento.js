@@ -6,7 +6,7 @@ window.AQUECIMENTO = {
   account: "CA05 - Alberto Pompeu",
   bm: "Alberto Neto",
   campaignId: "120248875845800318",
-  updatedAt: "09/09/2026 17:48",
+  updatedAt: "09/09/2026 14:53",
   goal: { spend: 20000, date: "2026-09-14" },   // investir 20k até o encerramento do L21 (14/09)
   rows: [
     { date:"2026-09-01", reach:10681, freq:3.772025, impr:40289, clicks:1128, spend:1641.14, cpm:40.73, cpc:1.45, ctr:2.80 },
