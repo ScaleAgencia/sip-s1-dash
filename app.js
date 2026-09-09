@@ -368,7 +368,8 @@ function barList(list,cls,total){ list=arr(list); var max=Math.max.apply(null,li
 var SRCMETA={
   'Facebook Ads':{kind:'ads',dot:'#22d3ee'}, 'Google Ads':{kind:'ads',dot:'#8b7cf0'},
   'TikTok':{kind:'org',dot:'#00d1c9'}, 'Instagram':{kind:'org',dot:'#e46aa7'}, 'YouTube':{kind:'org',dot:'#ff5a5a'},
-  'ManyChat':{kind:'msg',dot:'#5b8def'}, 'WhatsApp':{kind:'msg',dot:'#25d366'}
+  'ManyChat':{kind:'msg',dot:'#5b8def'}, 'WhatsApp':{kind:'msg',dot:'#25d366'},
+  'WhatsApp · alunos':{kind:'msg',dot:'#25d366'}, 'WhatsApp · leads antigos':{kind:'msg',dot:'#0e8f5a'}
 };
 var KINDLAB={ads:'Pago',org:'Orgânico',msg:'Mensageria',out:'Outros'};
 function srcMeta(l){ return SRCMETA[l] || {kind:'out',dot:'#8093b3'}; }
@@ -385,7 +386,7 @@ function renderSources(list,total){
       +'<div class="src-n">'+intf(x.n)+' <small>'+pct(dv(x.n,total)*100)+'</small></div></div>'; }).join('');
 }
 /* diário empilhado por rede / pago x orgânico */
-var REDECOLOR={ 'Facebook Ads':'#22d3ee','Google Ads':'#8b7cf0','TikTok':'#00d1c9','Insta bio':'#e46aa7','Insta direct':'#f59ecb','Instagram':'#e46aa7','YouTube':'#ff5a5a','ManyChat':'#5b8def','WhatsApp':'#25d366' };
+var REDECOLOR={ 'Facebook Ads':'#22d3ee','Google Ads':'#8b7cf0','TikTok':'#00d1c9','Insta bio':'#e46aa7','Insta direct':'#f59ecb','Instagram':'#e46aa7','YouTube':'#ff5a5a','ManyChat':'#5b8def','WhatsApp':'#25d366','WhatsApp · alunos':'#25d366','WhatsApp · leads antigos':'#0e8f5a' };
 function makeRedeColorer(keys){ var pal=['#f5b041','#a99bf7','#67e8f9','#f2637e','#5eead4','#fca5a5','#c4b5fd','#fb923c','#60a5fa','#f472b6','#a3e635','#2dd4bf','#fbbf24','#c084fc','#38bdf8','#fca5a5','#facc15','#34d399','#e879f9','#93c5fd'],u=0,map={};
   keys.forEach(function(k){ if(REDECOLOR[k])map[k]=REDECOLOR[k]; else {map[k]=pal[u%pal.length];u++;} }); return function(k){ return map[k]||'#8093b3'; }; }
 function renderStacked(elId, rows, keys, colorOf, labelOf, percent){

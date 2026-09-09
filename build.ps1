@@ -99,10 +99,18 @@ function IsPaid($src,$med){ $m=Deaccent $med; $s=Deaccent $src
   if($m -match 'pago' -or $m -match 'cpc' -or $m -match 'paid' -or $m -match 'ppc'){ return $true }
   if($s -eq 'facebook-ads' -or $s -eq 'fb-ads'){ return $true }
   return $false }
+# WhatsApp por utm_campaign (L21): a mesma fonte "whatsapp" traz DOIS publicos distintos,
+# marcados na coluna utm_campaign -> 'alunos' (aluno/base nova) vs 'leads-antigos' (base antiga).
+# Split so acontece nesses valores; qualquer outro utm_campaign (ou vazio) fica 'WhatsApp' puro,
+# entao o S1 (que nao usa esses campaigns) nao muda. Regra pedida p/ o L21 (08/09/2026).
+function WaKind($camp){ $c=Deaccent ([string]$camp)
+  if($c -eq 'alunos' -or $c -eq 'aluno'){ return 'WhatsApp '+[char]0xB7+' alunos' }
+  if($c -eq 'leads-antigos' -or $c -eq 'leads antigos'){ return 'WhatsApp '+[char]0xB7+' leads antigos' }
+  return 'WhatsApp' }
 # canal/fonte de origem (rotulo p/ o breakdown de fontes). ASCII-only (front prettifica).
 # utm_source VAZIA = TikTok: o pixel do TikTok nao popula utm (confirmado 08/2026 - 100%
 # dos leads sem utm caem na landing do funil). Nao afeta atribuicao (essa usa utm_campaign).
-function Channel($src){ $s=Deaccent $src
+function Channel($src,$camp){ $s=Deaccent $src
   if($s -eq ''){ return 'TikTok' }
   if($s -eq 'facebook-ads' -or $s -eq 'fb-ads' -or $s -eq 'facebook' -or $s -eq 'fb'){ return 'Facebook Ads' }
   if($s -like 'google*'){ return 'Google Ads' }
@@ -110,7 +118,7 @@ function Channel($src){ $s=Deaccent $src
   if($s -eq 'youtube' -or $s -eq 'yt'){ return 'YouTube' }
   if($s -like 'tiktok*'){ return 'TikTok' }
   if($s -eq 'manychat'){ return 'ManyChat' }
-  if($s -eq 'whatsapp' -or $s -eq 'wpp'){ return 'WhatsApp' }
+  if($s -eq 'whatsapp' -or $s -eq 'wpp'){ return (WaKind $camp) }
   return (TitleFirst $src) }
 # --- utm_campaign p/ o filtro da aba Perfil ---
 # Em query string o caractere '+' vale ESPACO, entao "PUBLICO 40+" e "PUBLICO 40 " sao a
@@ -119,7 +127,7 @@ function Channel($src){ $s=Deaccent $src
 function CampKey($c){ if($null -eq $c){return ''}; return (((([string]$c) -replace '\+',' ') -replace '\s+',' ').Trim().ToLower()) }
 function CampSrcLabel($rede){ if($rede -eq 'Facebook Ads'){return 'Meta'}; if($rede -eq 'Google Ads'){return 'Google'}; return [string]$rede }
 # fonte GRANULAR p/ o diario por rede: separa placement do organico via utm_term (bio/direct/...).
-function SourceGran($src,$med,$term){ $s=Deaccent $src; $t=Deaccent $term
+function SourceGran($src,$med,$term,$camp){ $s=Deaccent $src; $t=Deaccent $term
   if($s -eq ''){ return 'TikTok' }
   if($s -eq 'facebook-ads' -or $s -eq 'fb-ads' -or $s -eq 'facebook' -or $s -eq 'fb'){ return 'Facebook Ads' }
   if($s -like 'google*'){ return 'Google Ads' }
@@ -127,7 +135,7 @@ function SourceGran($src,$med,$term){ $s=Deaccent $src; $t=Deaccent $term
   if($s -eq 'youtube' -or $s -eq 'yt'){ return 'YouTube' }
   if($s -like 'tiktok*'){ return 'TikTok' }
   if($s -eq 'manychat'){ return 'ManyChat' }
-  if($s -eq 'whatsapp' -or $s -eq 'wpp'){ return 'WhatsApp' }
+  if($s -eq 'whatsapp' -or $s -eq 'wpp'){ return (WaKind $camp) }
   return (TitleFirst $src) }
 # lead de teste: e-mail da agencia, ou source/medium = "teste*"
 function IsTest($mail,$src,$med){
@@ -331,7 +339,7 @@ function Build-Funnel($cfg){
     if(IsTest $mail $src $med){ $nTest++; continue }
     $d=LeadDate $r[$L_DATE]; if($d -eq '' -and $L_CREATED -ge 0){ $d=IsoDate $r[$L_CREATED] }; if($d -eq ''){ $d='sem-data' }
     $paid = IsPaid $src $med
-    $chan = Channel $src
+    $chan = Channel $src $camp
     $stt = if($L_STATE -ge 0 -and $r.Count -gt $L_STATE){ TitleFirst $r[$L_STATE] } else { '' }
     $cty = if($L_CITY  -ge 0 -and $r.Count -gt $L_CITY ){ TitleFirst $r[$L_CITY]  } else { '' }
     # atribuicao por CANAL: casa 1o com Meta, senao com Google, senao organico/sem rastreio
@@ -345,7 +353,7 @@ function Build-Funnel($cfg){
     Bump $dState $stt; Bump $dCity $cty; Bump $dChannel $chan
     # ---- diario: leads por rede (granular) + pago/org por dia ----
     if($d -match '^\d{4}-\d{2}-\d{2}$'){
-      $rede = SourceGran $src $med $term
+      $rede = SourceGran $src $med $term $camp
       if(-not $srcTot.ContainsKey($rede)){ $srcTot[$rede]=0 }; $srcTot[$rede]++
       if(-not $srcDay.ContainsKey($d)){ $srcDay[$d]=@{} }
       if(-not $srcDay[$d].ContainsKey($rede)){ $srcDay[$d][$rede]=0 }; $srcDay[$d][$rede]++
