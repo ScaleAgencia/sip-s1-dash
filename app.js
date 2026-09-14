@@ -1044,11 +1044,13 @@ function mountAquec(){
   var tSpend=0,tImpr=0,tClicks=0;
   A.rows.forEach(function(r){ tSpend+=r.spend||0; tImpr+=r.impr||0; tClicks+=r.clicks||0; });
   var cpmT=tImpr?tSpend/tImpr*1000:0, cpcT=tClicks?tSpend/tClicks:0, ctrT=tImpr?tClicks/tImpr*100:0;
+  // total investido: usa spentTotal (informado pelo cliente) se presente; senão a soma das linhas
+  var spentShown = (+A.spentTotal>0) ? +A.spentTotal : tSpend;
   // meta de investimento do aquecimento (mesmo card de pacing do funil)
   var goalHTML='';
   if(A.goal && (+A.goal.spend>0) && A.goal.date){
     var bd={}; A.rows.forEach(function(r){ if(r.date&&r.spend){ bd[r.date]=(bd[r.date]||0)+r.spend; } });
-    goalHTML=goalCard(+A.goal.spend, A.goal.date, tSpend, bd, ' · Aquecimento L21', 'gasto Meta, sem imposto');
+    goalHTML=goalCard(+A.goal.spend, A.goal.date, spentShown, bd, ' · Aquecimento L21', 'gasto Meta, sem imposto');
   }
   var head='<thead><tr><th>Dia</th><th class="num">Alcance</th><th class="num">Frequência</th><th class="num">Impressões</th><th class="num">Cliques</th><th class="num">Gasto</th><th class="num">CPM</th><th class="num">CPC</th><th class="num">CTR</th></tr></thead>';
   var body=A.rows.slice().sort(function(a,b){return b.date.localeCompare(a.date);}).map(function(r){
@@ -1066,7 +1068,8 @@ function mountAquec(){
     +'<div class="card-h">🔥 Campanha de Aquecimento · L21 <span class="hint">'+esc(A.account)+' · BM '+esc(A.bm)+' · objetivo TRÁFEGO / remarketing</span></div>'
     +'<div class="aquec-camp">'+esc(A.campaign)+'</div>'
     +'<div class="table-scroll"><table class="tbl">'+head+'<tbody>'+body+'</tbody></table></div>'
-    +'<div class="aquec-note"><b>No período:</b> '+money0(tSpend)+' gasto · CPM médio '+money(cpmT)+' · CPC médio '+money(cpcT)+' · CTR médio '+nf1.format(ctrT)+'%.'
+    +'<div class="aquec-note"><b>Nesta campanha:</b> '+money0(tSpend)+' gasto · CPM médio '+money(cpmT)+' · CPC médio '+money(cpcT)+' · CTR médio '+nf1.format(ctrT)+'%.'
+    +(spentShown>tSpend+1 ? ' <b>Total investido no aquecimento: '+money0(spentShown)+'</b> (inclui gasto fora desta campanha).' : '')
     +'<br><small>Puxado via MCP do Meta Ads (snapshot '+esc(A.updatedAt||'')+'). Como o build automático de 3h lê só as planilhas do Google, esta aba <b>não atualiza sozinha</b> — peça um refresh que eu re-puxo do Meta e regravo.</small></div>'
     +'</div>';
 }

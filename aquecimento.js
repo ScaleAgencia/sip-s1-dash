@@ -8,6 +8,7 @@ window.AQUECIMENTO = {
   campaignId: "120248875845800318",
   updatedAt: "14/09/2026 09:28",
   goal: { spend: 20000, date: "2026-09-14" },   // investir 20k até o encerramento do L21 (14/09)
+  spentTotal: 18568,   // total investido no aquecimento informado pelo cliente (14/09). Esta campanha somou R$17.701; o restante veio de aquecimento fora desta campanha. Dirige o card de meta; a tabela diária segue os dados reais desta campanha.
   rows: [
     { date:"2026-09-01", reach:10681, freq:3.772025, impr:40289, clicks:1128, spend:1641.14, cpm:40.73, cpc:1.45, ctr:2.80 },
     { date:"2026-09-02", reach:11347, freq:3.22279,  impr:36569, clicks:1063, spend:1557.21, cpm:42.58, cpc:1.46, ctr:2.91 },
