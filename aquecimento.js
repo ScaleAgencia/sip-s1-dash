@@ -6,7 +6,7 @@ window.AQUECIMENTO = {
   account: "CA05 - Alberto Pompeu",
   bm: "Alberto Neto",
   campaignId: "120248875845800318",
-  updatedAt: "12/09/2026 12:28",
+  updatedAt: "14/09/2026 09:28",
   goal: { spend: 20000, date: "2026-09-14" },   // investir 20k até o encerramento do L21 (14/09)
   rows: [
     { date:"2026-09-01", reach:10681, freq:3.772025, impr:40289, clicks:1128, spend:1641.14, cpm:40.73, cpc:1.45, ctr:2.80 },
@@ -19,7 +19,8 @@ window.AQUECIMENTO = {
     { date:"2026-09-08", reach:12513, freq:2.914009, impr:36463, clicks:812,  spend:1162.09, cpm:31.87, cpc:1.43, ctr:2.23 },
     { date:"2026-09-09", reach:12195, freq:2.906437, impr:35444, clicks:850,  spend:1335.48, cpm:37.68, cpc:1.57, ctr:2.40 },
     { date:"2026-09-10", reach:11225, freq:2.684811, impr:30137, clicks:707,  spend:1140.55, cpm:37.85, cpc:1.61, ctr:2.35 },
-    { date:"2026-09-11", reach:11948, freq:2.931788, impr:35029, clicks:819,  spend:1320.59, cpm:37.70, cpc:1.61, ctr:2.34 },
-    { date:"2026-09-12", reach:6340,  freq:1.904416, impr:12074, clicks:299,  spend:497.30,  cpm:41.19, cpc:1.66, ctr:2.48 }
+    { date:"2026-09-11", reach:11948, freq:2.932039, impr:35032, clicks:819,  spend:1320.81, cpm:37.70, cpc:1.61, ctr:2.34 },
+    { date:"2026-09-12", reach:13535, freq:2.519985, impr:34108, clicks:929,  spend:1263.79, cpm:37.05, cpc:1.36, ctr:2.72 },
+    { date:"2026-09-13", reach:13159, freq:2.579983, impr:33950, clicks:899,  spend:1168.97, cpm:34.43, cpc:1.30, ctr:2.65 }
   ]
 };
