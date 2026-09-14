@@ -1052,6 +1052,38 @@ function mountAquec(){
     var bd={}; A.rows.forEach(function(r){ if(r.date&&r.spend){ bd[r.date]=(bd[r.date]||0)+r.spend; } });
     goalHTML=goalCard(+A.goal.spend, A.goal.date, spentShown, bd, ' · Aquecimento L21', 'gasto Meta, sem imposto');
   }
+  // campanhas ativas HOJE (ex.: "É HOJE / Isolado") — foco em ALCANCE + FREQUÊNCIA
+  var activeHTML='';
+  if(A.activeToday && A.activeToday.camps && A.activeToday.camps.length){
+    var AT=A.activeToday, cs=AT.camps.slice().sort(function(a,b){return (b.reach||0)-(a.reach||0);});
+    var f2=function(x){ return (Math.round((x||0)*100)/100).toFixed(2).replace('.',','); };
+    var sReach=0,sImpr=0,sClicks=0,sSpend=0;
+    cs.forEach(function(c){ sReach+=c.reach||0; sImpr+=c.impr||0; sClicks+=c.clicks||0; sSpend+=c.spend||0; });
+    var freqAll=sReach?sImpr/sReach:0;
+    var arows=cs.map(function(c){
+      return '<tr><td>'+esc(c.name)+'</td>'
+        +'<td class="num" style="color:var(--cy)"><b>'+intf(c.reach)+'</b></td>'
+        +'<td class="num" style="color:var(--cy)"><b>'+f2(c.freq)+'</b></td>'
+        +'<td class="num">'+intf(c.impr)+'</td>'
+        +'<td class="num">'+intf(c.clicks)+'</td>'
+        +'<td class="num">'+money(c.spend)+'</td>'
+        +'<td class="num">'+money(c.cpm)+'</td>'
+        +'<td class="num">'+money(c.cpc)+'</td>'
+        +'<td class="num">'+nf1.format(c.ctr)+'%</td></tr>';
+    }).join('');
+    activeHTML='<div class="card">'
+      +'<div class="card-h">📣 Campanhas ativas HOJE · <b>É HOJE / Isolado</b> <span class="hint">'+esc(AT.account||A.account)+' · dia do evento '+fmtBR(AT.date||'')+' · snapshot '+esc(AT.updatedAt||'')+' · métricas do dia (sobem ao longo do dia)</span></div>'
+      +'<div class="stat-row">'
+        +'<div class="stat"><div class="s-v">'+intf(sReach)+'</div><div class="s-l">Alcance somado</div></div>'
+        +'<div class="stat"><div class="s-v">'+f2(freqAll)+'</div><div class="s-l">Frequência média</div></div>'
+        +'<div class="stat"><div class="s-v">'+intf(sImpr)+'</div><div class="s-l">Impressões</div></div>'
+        +'<div class="stat"><div class="s-v">'+money0(sSpend)+'</div><div class="s-l">Gasto hoje</div></div></div>'
+      +'<div class="table-scroll"><table class="tbl">'
+        +'<thead><tr><th>Campanha</th><th class="num">Alcance</th><th class="num">Frequência</th><th class="num">Impressões</th><th class="num">Cliques</th><th class="num">Gasto</th><th class="num">CPM</th><th class="num">CPC</th><th class="num">CTR</th></tr></thead>'
+        +'<tbody>'+arows+'</tbody></table></div>'
+      +'<div class="aquec-note"><small>'+(AT.note?esc(AT.note)+' ':'')+'Alcance somado inclui sobreposição entre campanhas (a mesma pessoa pode aparecer em mais de uma) · frequência média = impressões ÷ alcance somado. Puxado via MCP do Meta (nível campanha, só as ativas hoje) — snapshot, não atualiza sozinho.</small></div>'
+      +'</div>';
+  }
   var head='<thead><tr><th>Dia</th><th class="num">Alcance</th><th class="num">Frequência</th><th class="num">Impressões</th><th class="num">Cliques</th><th class="num">Gasto</th><th class="num">CPM</th><th class="num">CPC</th><th class="num">CTR</th></tr></thead>';
   var body=A.rows.slice().sort(function(a,b){return b.date.localeCompare(a.date);}).map(function(r){
     return '<tr><td>'+fmtBR(r.date)+'</td>'
@@ -1064,8 +1096,8 @@ function mountAquec(){
       +'<td class="num">'+money(r.cpc)+'</td>'
       +'<td class="num">'+nf1.format(r.ctr)+'%</td></tr>';
   }).join('');
-  w.innerHTML=goalHTML+'<div class="card">'
-    +'<div class="card-h">🔥 Campanha de Aquecimento · L21 <span class="hint">'+esc(A.account)+' · BM '+esc(A.bm)+' · objetivo TRÁFEGO / remarketing</span></div>'
+  w.innerHTML=goalHTML+activeHTML+'<div class="card">'
+    +'<div class="card-h">🔥 Aquecimento · L21 (histórico diário) <span class="hint">'+esc(A.account)+' · BM '+esc(A.bm)+' · objetivo TRÁFEGO / remarketing</span></div>'
     +'<div class="aquec-camp">'+esc(A.campaign)+'</div>'
     +'<div class="table-scroll"><table class="tbl">'+head+'<tbody>'+body+'</tbody></table></div>'
     +'<div class="aquec-note"><b>Nesta campanha:</b> '+money0(tSpend)+' gasto · CPM médio '+money(cpmT)+' · CPC médio '+money(cpcT)+' · CTR médio '+nf1.format(ctrT)+'%.'
