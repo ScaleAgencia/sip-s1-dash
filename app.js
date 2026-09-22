@@ -508,22 +508,67 @@ function renderEngTable(rows){
   if(!rows.length) body='<tr><td colspan="8" class="empty">Sem dados.</td></tr>';
   el('engTbl').innerHTML=head+'<tbody>'+body+'</tbody>';
 }
+/* aba Pesquisa: filtro de data próprio (ex.: a partir de 19/09 isola o S4) */
+var engPeriod='tudo', engCustom=null;
+function engRangeFor(k){
+  if(k==='custom' && engCustom) return engCustom;
+  if(k==='hoje')  return [maxDate,maxDate];
+  if(k==='ontem'){ var y=addDays(maxDate,-1); return [y,y]; }
+  if(k==='7d')    return [addDays(maxDate,-6),  maxDate];
+  if(k==='30d')   return [addDays(maxDate,-29), maxDate];
+  return [minDate,maxDate];
+}
+function engPeriodsHTML(){
+  return PRESETS.map(function(p){return '<button data-k="'+p.k+'" class="pbtn">'+p.label+'</button>';}).join('')
+    + '<span class="daterange" id="engDaterange"><span class="dr-l">De</span> <input type="date" id="engDtDe" min="'+minDate+'" max="'+maxDate+'"> <span class="dr-l">até</span> <input type="date" id="engDtAte" min="'+minDate+'" max="'+maxDate+'"></span>';
+}
+function syncEngPeriodUI(){
+  var box=el('engPeriods'); if(!box) return; var rng=engRangeFor(engPeriod);
+  Array.prototype.forEach.call(box.querySelectorAll('.pbtn'),function(b){ b.classList.toggle('on', engPeriod===b.getAttribute('data-k')); });
+  var dr=el('engDaterange'); if(dr) dr.classList.toggle('on', engPeriod==='custom');
+  var de=el('engDtDe'), ate=el('engDtAte'); if(de&&ate){ de.value=rng[0]; ate.value=rng[1]; }
+}
+function initEngPeriods(){
+  var box=el('engPeriods'); if(!box) return;
+  box.innerHTML=engPeriodsHTML();
+  Array.prototype.forEach.call(box.querySelectorAll('.pbtn'),function(b){
+    b.addEventListener('click',function(){ engPeriod=b.getAttribute('data-k'); engCustom=null; syncEngPeriodUI(); mountEngage(); });
+  });
+  var de=el('engDtDe'), ate=el('engDtAte');
+  if(de&&ate){ function onD(){ var s=de.value,e=ate.value; if(!s||!e)return; if(s>e){var t=s;s=e;e=t;} if(s<minDate)s=minDate; if(e>maxDate)e=maxDate; engCustom=[s,e]; engPeriod='custom'; syncEngPeriodUI(); mountEngage(); }
+    de.addEventListener('change',onD); ate.addEventListener('change',onD); }
+  syncEngPeriodUI();
+}
 function mountEngage(){
-  var E=D.engage||{}, sv=E.survey||{}, gp=E.groups||{}, rows=arr(E.byDay), leads=E.leads||0;
-  var resp=(sv.respondents!=null?sv.respondents:sv.completed)||0, svRate=dv(resp,leads), gpRate=dv(gp.entered,leads);
+  if(!el('surveyHero')) return;
+  var E=D.engage||{}, sv=E.survey||{}, gp=E.groups||{}, all=arr(E.byDay);
+  var rng=engRangeFor(engPeriod), isAll=(engPeriod==='tudo');
+  var rows=all.filter(function(r){ return isDate(r.date) && inRange(r.date,rng); });
+  var leadsS=0, respRows=0, respAll=0, ginS=0, goutS=0;
+  rows.forEach(function(r){ leadsS+=+r.leads||0; respRows+=+r.survey||0; respAll+=+r.surveyAll||0; ginS+=+r.groupIn||0; goutS+=+r.groupOut||0; });
+  // "Tudo" usa os números deduplicados globais (respondentes distintos por e-mail, p/ casar com a aba Perfil);
+  // um recorte por data usa as respostas completas SOMADAS no período (byDay não tem dedup por e-mail).
+  var leads = isAll ? (E.leads||leadsS) : leadsS;
+  var resp  = isAll ? ((sv.respondents!=null?sv.respondents:sv.completed)||respRows) : respRows;
+  var inc   = isAll ? (sv.incomplete||0) : Math.max(0, respAll-respRows);
+  var gin   = isAll ? (gp.entered!=null?gp.entered:ginS) : ginS;
+  var gout  = isAll ? (gp.left!=null?gp.left:goutS) : goutS;
+  var net   = isAll ? (gp.net!=null?gp.net:(gin-gout)) : (gin-gout);
+  var svRate=dv(resp,leads), gpRate=dv(gin,leads), sfx=isAll?'':' <small>(no período)</small>';
   el('engStats').innerHTML='<div class="stat-row" style="grid-template-columns:repeat(3,1fr)">'
-    +'<div class="stat"><div class="s-v">'+intf(leads)+'</div><div class="s-l">Leads captados</div></div>'
+    +'<div class="stat"><div class="s-v">'+intf(leads)+'</div><div class="s-l">Leads captados'+sfx+'</div></div>'
     +'<div class="stat resp"><div class="s-v">'+intf(resp)+'</div><div class="s-l">Responderam a pesquisa <small>(completas)</small></div></div>'
-    +'<div class="stat grp"><div class="s-v">'+intf(gp.net)+'</div><div class="s-l">Pessoas nos grupos</div></div></div>';
+    +'<div class="stat grp"><div class="s-v">'+intf(net)+'</div><div class="s-l">Pessoas nos grupos'+sfx+'</div></div></div>';
   var sh=el('surveyHero'); sh.className='rate-hero cy';
   sh.innerHTML='<span class="rh-val">'+pct(svRate*100)+'</span>'
-    +'<span class="rh-det"><b>'+intf(resp)+'</b> responderam a pesquisa (completa) de <b>'+intf(leads)+'</b> leads'+(sv.incomplete?' · '+intf(sv.incomplete)+' incompletas (não classificadas)':'')
-    +'<br>é essa base de <b>'+intf(resp)+'</b> que alimenta a classificação A/B/C da aba <b>Perfil do Lead</b></span>';
+    +'<span class="rh-det"><b>'+intf(resp)+'</b> responderam a pesquisa (completa) de <b>'+intf(leads)+'</b> leads'+(inc?' · '+intf(inc)+' incompletas (não classificadas)':'')
+    +(isAll?'<br>é essa base de <b>'+intf(resp)+'</b> que alimenta a classificação A/B/C da aba <b>Perfil do Lead</b>'
+           :'<br>recorte de <b>'+fmtBR(rng[0])+'</b> a <b>'+fmtBR(rng[1])+'</b> · a partir de 19/09 = só a turma S4')+'</span>';
   renderRateChart('chartSurvey', rows, function(r){return r.survey;}, function(r){return dv(r.survey,r.leads);}, COL.cy, 'Respostas');
   var gh=el('groupHero'); gh.className='rate-hero gr';
   gh.innerHTML='<span class="rh-val">'+pct(gpRate*100)+'</span>'
-    +'<span class="rh-det"><b>'+intf(gp.entered)+'</b> entradas de <b>'+intf(leads)+'</b> leads'
-    +'<br>'+intf(gp.entered)+' entraram · '+intf(gp.left)+' saíram · <b>'+intf(gp.net)+'</b> ativos no grupo</span>';
+    +'<span class="rh-det"><b>'+intf(gin)+'</b> entradas de <b>'+intf(leads)+'</b> leads'
+    +'<br>'+intf(gin)+' entraram · '+intf(gout)+' saíram · <b>'+intf(net)+'</b> ativos no grupo</span>';
   renderRateChart('chartGroup', rows, function(r){return r.groupIn;}, function(r){return dv(r.groupIn,r.leads);}, COL.good, 'Entradas');
   renderEngTable(rows);
 }
@@ -1146,8 +1191,8 @@ function switchFunnel(key){
   updateBranding(); syncFunnelUI(); syncChannelUI();
   profPeriod='tudo'; profSrc=-1; profMed=-1; profCamp=-1; fase='all'; acompWin=7;
   microPath=[]; microMetric='leads'; microPeriod='tudo';
-  qualPeriod='tudo';
-  initFases(); initPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountAquec(); mountQualidade(); syncL21Tabs();
+  qualPeriod='tudo'; engPeriod='tudo'; engCustom=null;
+  initFases(); initPeriods(); initEngPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountAquec(); mountQualidade(); syncL21Tabs();
   if(history.replaceState){ history.replaceState(null,'', location.pathname+'?funnel='+key+(location.hash||'')); }
 }
 function initFunnels(){
@@ -1162,5 +1207,5 @@ function initFunnels(){
 }
 
 if(!funnels.length || (!daily.length && !grain.length)){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
-else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountAquec(); mountQualidade(); syncL21Tabs(); }
+else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initEngPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountAquec(); mountQualidade(); syncL21Tabs(); }
 })();
