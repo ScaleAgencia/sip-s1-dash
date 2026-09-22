@@ -19,6 +19,7 @@ $FUNNELS = @(
   [ordered]@{ key='s1';  label='SIP-S1';
     queriesId='1WKRLwQpK4xcoQENOZPk01qROgbTL9vLqTxyp8sfo_9A'; metaGid='0'; googleGid='1609119011';
     leadsId='1nTJYpjYLlK8ZOfA-V9faNSuqz-oegrhccmOgGvrEzm0';   leadsGid='566747937'
+    surveyTabs=@('pesquisa','pesquisa_s4')   # S4 caiu numa aba de pesquisa separada (add 22/09); le e junta as duas
     goalSpend=0; goalDate=''
     # metas de investimento POR FASE (tag do lead) · com impostos · chave = tag exata
     faseGoals=@{ 'SIP-S4'=@{ spend=20000; date='2026-10-05' } } }
@@ -371,31 +372,36 @@ function Build-Funnel($cfg){
 
   # ---- PESQUISA (respostas por pessoa; cruza por e-mail; classe A/B/C do perfil) ----
   $survTotal=0; $survDone=0; $survInc=0; $survDoneByDay=@{}; $survAllByDay=@{}; $respMails=@{}; $respProfile=@{}
-  if($leadsOk){ try {
-    $pCsv=Join-Path $dataDir 'pesquisa.csv'; Get-SheetByName $cfg.leadsId 'pesquisa' $pCsv
-    $pp=Read-Csv $pCsv; $ph=$pp[0]; $pdRows=$pp[1..($pp.Count-1)]
-    $P_MAIL=HdrLike $ph '*mail*'; $P_STATUS=HdrLike $ph 'status'; $P_DATE=HdrLike $ph 'date'
-    $P_IDADE=HdrLike $ph '*idade*'; $P_MOM=HdrLike $ph '*momento profissional*'; $P_INVEST=HdrLike $ph '*ja investiu*'
-    $P_RENDA=HdrLike $ph '*faixa de renda*'; $P_DISPON=HdrLike $ph '*disponivel para investir*'; $P_CURSO=HdrLike $ph '*comprou algum curso*'
-    foreach($r in $pdRows){
-      if($null -eq $r -or $r.Count -eq 0){ continue }
-      $pm = if($P_MAIL -ge 0 -and $r.Count -gt $P_MAIL){ (Norm $r[$P_MAIL]).ToLower() } else { '' }
-      $pst= if($P_STATUS -ge 0 -and $r.Count -gt $P_STATUS){ Deaccent $r[$P_STATUS] } else { '' }
-      $pd = if($P_DATE -ge 0 -and $r.Count -gt $P_DATE){ LeadDate $r[$P_DATE] } else { '' }
-      if($pm -eq '' -and $pst -eq '' -and $pd -eq ''){ continue }
-      $done = ($pst -eq 'completed' -or $pst -eq 'complete')
-      $survTotal++; if($done){ $survDone++ } elseif($pst -eq 'incomplete'){ $survInc++ }
-      # SO classifica quem COMPLETOU (incompletos/em branco nao dao pra pontuar A/B/C e poluiriam)
-      if($done -and $pm -ne ''){ $respMails[$pm]=$true
-        $vId=Cell $r $P_IDADE; $vMo=Cell $r $P_MOM; $vRe=Cell $r $P_RENDA; $vDi=Cell $r $P_DISPON; $vIn=Cell $r $P_INVEST; $vCu=Cell $r $P_CURSO
-        # mantem a resposta MAIS RECENTE por e-mail (data desc); empate -> primeira
-        if(-not $respProfile.ContainsKey($pm) -or ($pd -ne '' -and $pd -gt $respProfile[$pm].date)){
-          $respProfile[$pm]=@{ date=$pd; cls=(LeadClass $vId $vMo $vRe $vDi); a=(IdxIdade $vId); m=(IdxMomento $vMo); r=(IdxRenda $vRe); p=(IdxDispon $vDi); v=(IdxInvest $vIn); u=(IdxCurso $vCu) }
+  if($leadsOk){
+    # abas de pesquisa (S4 caiu numa aba separada 'pesquisa_s4'); le e ACUMULA todas.
+    # respProfile fica com a resposta mais recente por e-mail, entao juntar abas nao duplica.
+    $surveyTabs = if($cfg.Contains('surveyTabs') -and $cfg.surveyTabs){ @($cfg.surveyTabs) } else { @('pesquisa') }
+    foreach($stab in $surveyTabs){ try {
+      $pCsv=Join-Path $dataDir ($stab + '.csv'); Get-SheetByName $cfg.leadsId $stab $pCsv
+      $pp=Read-Csv $pCsv; $ph=$pp[0]; $pdRows=$pp[1..($pp.Count-1)]
+      $P_MAIL=HdrLike $ph '*mail*'; $P_STATUS=HdrLike $ph 'status'; $P_DATE=HdrLike $ph 'date'
+      $P_IDADE=HdrLike $ph '*idade*'; $P_MOM=HdrLike $ph '*momento profissional*'; $P_INVEST=HdrLike $ph '*ja investiu*'
+      $P_RENDA=HdrLike $ph '*faixa de renda*'; $P_DISPON=HdrLike $ph '*disponivel para investir*'; $P_CURSO=HdrLike $ph '*comprou algum curso*'
+      foreach($r in $pdRows){
+        if($null -eq $r -or $r.Count -eq 0){ continue }
+        $pm = if($P_MAIL -ge 0 -and $r.Count -gt $P_MAIL){ (Norm $r[$P_MAIL]).ToLower() } else { '' }
+        $pst= if($P_STATUS -ge 0 -and $r.Count -gt $P_STATUS){ Deaccent $r[$P_STATUS] } else { '' }
+        $pd = if($P_DATE -ge 0 -and $r.Count -gt $P_DATE){ LeadDate $r[$P_DATE] } else { '' }
+        if($pm -eq '' -and $pst -eq '' -and $pd -eq ''){ continue }
+        $done = ($pst -eq 'completed' -or $pst -eq 'complete')
+        $survTotal++; if($done){ $survDone++ } elseif($pst -eq 'incomplete'){ $survInc++ }
+        # SO classifica quem COMPLETOU (incompletos/em branco nao dao pra pontuar A/B/C e poluiriam)
+        if($done -and $pm -ne ''){ $respMails[$pm]=$true
+          $vId=Cell $r $P_IDADE; $vMo=Cell $r $P_MOM; $vRe=Cell $r $P_RENDA; $vDi=Cell $r $P_DISPON; $vIn=Cell $r $P_INVEST; $vCu=Cell $r $P_CURSO
+          # mantem a resposta MAIS RECENTE por e-mail (data desc); empate -> primeira
+          if(-not $respProfile.ContainsKey($pm) -or ($pd -ne '' -and $pd -gt $respProfile[$pm].date)){
+            $respProfile[$pm]=@{ date=$pd; cls=(LeadClass $vId $vMo $vRe $vDi); a=(IdxIdade $vId); m=(IdxMomento $vMo); r=(IdxRenda $vRe); p=(IdxDispon $vDi); v=(IdxInvest $vIn); u=(IdxCurso $vCu) }
+          }
         }
+        if($pd -ne ''){ Bump $survAllByDay $pd; if($done){ Bump $survDoneByDay $pd } }
       }
-      if($pd -ne ''){ Bump $survAllByDay $pd; if($done){ Bump $survDoneByDay $pd } }
-    }
-  } catch { Write-Host ("AVISO: [$name] aba pesquisa nao lida: "+$_.Exception.Message) } }
+    } catch { Write-Host ("AVISO: [$name] aba $stab nao lida: "+$_.Exception.Message) } }
+  }
   $respLeads=0; foreach($m in $respMails.Keys){ if($leadMails.ContainsKey($m)){ $respLeads++ } }
 
   # ---- CLASSE A/B/C por lead atribuido: acumula por dia/grain (p/ CPL A/B/C e Acao) ----
