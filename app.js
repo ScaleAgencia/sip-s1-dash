@@ -76,6 +76,10 @@ var fase='all';        // filtro global de FASE (turma): 'all' ou a tag (SIP-S1/
 function faseMatch(d){ return fase==='all' || d.fase===fase; }
 function faseLabel(k){ return String(k).replace(/^SIP-/i,''); }
 function faseSpend(){ var s=0; daily.forEach(function(d){ if(faseMatch(d)) s+=d.spend||0; }); return s; }
+/* janela de datas [min,max] em que a turma teve atividade (p/ recortar a aba Pesquisa por data) */
+function faseDateWindow(fk){ var mn=null,mx=null;
+  daily.forEach(function(d){ if(d.fase===fk && isDate(d.date)){ if(mn===null||d.date<mn)mn=d.date; if(mx===null||d.date>mx)mx=d.date; } });
+  return (mn&&mx)?[mn,mx]:null; }
 /* agregado de leads da fase selecionada (aba Leads/coverage) */
 function leadAgg(){
   if(fase==='all') return {leads:totals.leads||0,paid:totals.paid||0,organic:totals.organic||0,attributed:totals.attributed||0,states:totals.states||0,channels:arr(D.channels),geo:arr(D.geo),cities:arr(D.cities)};
@@ -776,7 +780,13 @@ function initChannels(){
 }
 /* ---- filtro global de FASE (turma: SIP-S1 / SIP-S2 / ...) ---- */
 function syncFaseUI(){ if(!el('fasebar'))return; Array.prototype.forEach.call(el('fasebar').querySelectorAll('.fbtn2'),function(b){ b.classList.toggle('on', fase===b.getAttribute('data-f')); }); }
-function applyFase(){ treeInited=false; syncFaseUI(); initCoverage(); renderAll(); mountLeads(); mountProfile(); mountAcomp(); mountMicro(); }
+function applyFase(){
+  // a aba Pesquisa acompanha a turma: recorta pela janela de datas dela (S4 = a partir de 19/09).
+  // vira um range custom (refletido nos inputs De/Até), que o usuário ainda pode ajustar à mão depois.
+  if(fase==='all'){ engPeriod='tudo'; engCustom=null; }
+  else { var fw=faseDateWindow(fase); if(fw){ engPeriod='custom'; engCustom=fw; } else { engPeriod='tudo'; engCustom=null; } }
+  syncEngPeriodUI();
+  treeInited=false; syncFaseUI(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountAcomp(); mountMicro(); }
 function initFases(){ var box=el('fasebar'); if(!box) return; var fs=arr(D.fases);
   if(fs.length<2){ box.innerHTML=''; box.style.display='none'; fase='all'; return; }
   box.style.display='';
