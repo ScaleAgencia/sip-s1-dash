@@ -22,7 +22,7 @@ $FUNNELS = @(
     surveyTabs=@('pesquisa','pesquisa_s4')   # S4 caiu numa aba de pesquisa separada (add 22/09); le e junta as duas
     goalSpend=0; goalDate=''
     # metas de investimento POR FASE (tag do lead) · com impostos · chave = tag exata
-    faseGoals=@{ 'SIP-S4'=@{ spend=20000; date='2026-10-05' } } }
+    faseGoals=@{ 'SIP-S4'=@{ spend=10000; date='2026-10-05' } } }
   [ordered]@{ key='l21'; label='SIP-L21';
     queriesId='1MzEn8jtxvEQbAWgA1Btg1cL5Q-mB3oA8KygVJfrgszo'; metaGid='0'; googleGid='1609119011';
     # (Google agora consolida TODAS as campanhas numa aba so, gid 1609119011 -> sem abas extras.
