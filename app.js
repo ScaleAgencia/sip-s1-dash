@@ -238,7 +238,7 @@ function renderDaily(rng){
     return '<tr><td>'+fmtBR(r.date)+'</td>'
       +'<td class="num"><span class="heatcell" style="'+heatBg('34,211,238',r.spend/maxS)+'">'+money0(r.spend)+'</span></td>'
       +'<td class="num"><span class="heatcell" style="'+heatBg('103,232,249',r.leads/maxL)+'">'+intf(r.leads)+'</span></td>'
-      +'<td class="num">'+(cpl!=null?'<span class="cpl-pill '+relClass(cpl,medCpl)+'">'+money0(cpl)+'</span>':'—')+'</td>'
+      +'<td class="num">'+(cpl!=null?'<span class="cpl-pill '+relClass(cpl,medCpl)+'">'+money(cpl)+'</span>':'—')+'</td>'
       +'<td class="num"><span class="cpl-pill '+relClass(cpm,medCpm)+'">'+money(cpm)+'</span></td>'
       +'<td class="num">'+pct(ctr)+'</td>'
       +'<td class="num">'+(r.clicks>0?pct(cvp):'—')+'</td></tr>';
@@ -292,14 +292,16 @@ function actTag(n,medA){
 }
 function abcCell(v,cls){ return '<td class="num">'+(v?'<b class="c'+cls+'">'+intf(v)+'</b>':'<span class="muted3">0</span>')+'</td>'; }
 function abcMixCell(n){ return '<td class="num abc-mix"><b class="cA">'+intf(n.la)+'</b><small class="muted3"> · '+intf(n.lb)+' · '+intf(n.lc)+'</small></td>'; }
-function metricsCells(n,medA){
-  var cpla=n.la>0?dv(n.spend,n.la):null, cplb=n.lb>0?dv(n.spend,n.lb):null, tag=actTag(n,medA);
-  var cA  = cpla!=null?'<span class="cpl-pill '+relClass(cpla,medA)+'">'+money0(cpla)+'</span>':'—';
+function metricsCells(n,medA,medB,medC,medL){
+  var cpla=n.la>0?dv(n.spend,n.la):null, cplb=n.lb>0?dv(n.spend,n.lb):null, cplv=n.leads>0?dv(n.spend,n.leads):null, tag=actTag(n,medA);
+  // otimização por CPL: o CPL é o metric colorido (verde/amarelo/vermelho vs. mediana) e COM centavos (diferenciar diferenças pequenas)
+  var cpl = cplv!=null?'<span class="cpl-pill '+relClass(cplv,medL)+'">'+money(cplv)+'</span>':'—';
+  // Custo Lead A/B seguem visíveis (leadscoring), mas agora SEM cor
+  var cA  = cpla!=null?'<span class="cpl-plain">'+money0(cpla)+'</span>':'—';
   var cB  = cplb!=null?'<span class="cpl-plain">'+money0(cplb)+'</span>':'—';
   var ctr = n.impr>0?   pct(dv(n.clicks,n.impr)*100)   : '—';
   var cpm = n.impr>0?   money0(dv(n.spend,n.impr)*1000): '—';
   var cpc = n.clicks>0? money(dv(n.spend,n.clicks))    : '—';
-  var cpl = n.leads>0?  money0(dv(n.spend,n.leads))    : '—';
   var cvp = n.clicks>0? pct(dv(n.leads,n.clicks)*100)  : '—';
   var cvq = n.clicks>0? pct(dv(n.la,n.clicks)*100)     : '—';
   return '<td class="num">'+money0(n.spend)+'</td>'
@@ -314,10 +316,10 @@ function metricsCells(n,medA){
     +'<td class="num">'+cB+'</td>'
     +'<td class="num">'+cvq+'</td>'
     +'<td class="num"><span class="act '+tag.c+'">'+tag.t+'</span></td>'; }
-function treeRow(n,lvl,key,hasKids,medA,medB,medC){
+function treeRow(n,lvl,key,hasKids,medA,medB,medC,medL){
   var caret=hasKids?'<span class="caret'+(expanded[key]?' open':'')+'">▶</span>':'<span class="caret" style="opacity:.2">•</span>';
   return '<tr class="lvl'+lvl+(hasKids?' parent':'')+'" data-key="'+encodeURIComponent(key)+'">'
-    +'<td><span class="name" title="'+esc(n.full||n.name)+'">'+caret+' '+esc(n.name)+'</span></td>'+metricsCells(n,medA,medB,medC)+'</tr>';
+    +'<td><span class="name" title="'+esc(n.full||n.name)+'">'+caret+' '+esc(n.name)+'</span></td>'+metricsCells(n,medA,medB,medC,medL)+'</tr>';
 }
 function cmpNodes(a,b){
   if(treeSort.key==='name'){ return treeSort.dir * String(a.name).localeCompare(String(b.name),'pt',{numeric:true}); }
@@ -330,8 +332,8 @@ function sortKids(obj){ return Object.keys(obj).sort(function(x,y){ return cmpNo
 function renderTree(rng){
   var rows=grain.filter(function(r){return inRange(r.date,rng)&&chMatch(r)&&faseMatch(r);});
   var camps=buildTree(rows), order=sortKids(camps);
-  var lA=[],lB=[],lC=[]; order.forEach(function(cK){ if(cK==='SEM_RASTREIO')return; var c=camps[cK]; Object.keys(c.kids).forEach(function(sK){ var sN=c.kids[sK]; Object.keys(sN.kids).forEach(function(aK){ var an=sN.kids[aK]; if(an.spend>0&&an.la>0) lA.push(dv(an.spend,an.la)); if(an.spend>0&&an.lb>0) lB.push(dv(an.spend,an.lb)); if(an.spend>0&&an.lc>0) lC.push(dv(an.spend,an.lc)); }); }); });
-  var medA=median(lA), medB=median(lB), medC=median(lC);
+  var lA=[],lB=[],lC=[],lL=[]; order.forEach(function(cK){ if(cK==='SEM_RASTREIO')return; var c=camps[cK]; Object.keys(c.kids).forEach(function(sK){ var sN=c.kids[sK]; Object.keys(sN.kids).forEach(function(aK){ var an=sN.kids[aK]; if(an.spend>0&&an.la>0) lA.push(dv(an.spend,an.la)); if(an.spend>0&&an.lb>0) lB.push(dv(an.spend,an.lb)); if(an.spend>0&&an.lc>0) lC.push(dv(an.spend,an.lc)); if(an.spend>0&&an.leads>0) lL.push(dv(an.spend,an.leads)); }); }); });
+  var medA=median(lA), medB=median(lB), medC=median(lC), medL=median(lL);
   if(!treeInited){ order.forEach(function(cK){ expanded['c:'+cK]=true; }); treeInited=true; }
   var head='<thead><tr>'+TREECOLS.map(function(c){
     if(!c.k) return '<th class="'+c.cls+'">'+c.lab+'</th>';
@@ -339,15 +341,15 @@ function renderTree(rng){
     return '<th class="'+c.cls+' sortable'+(act?' act':'')+'" data-sort="'+c.k+'" title="Clique p/ ordenar">'+c.lab+car+'</th>';
   }).join('')+'</tr></thead>';
   var out=[];
-  order.forEach(function(cK){ var c=camps[cK],cKey='c:'+cK,cHas=Object.keys(c.kids).length>0; out.push(treeRow(c,0,cKey,cHas,medA,medB,medC));
-    if(expanded[cKey]){ sortKids(c.kids).forEach(function(sK){ var sN=c.kids[sK],sKey=cKey+'|s:'+sK,sHas=Object.keys(sN.kids).length>0; out.push(treeRow(sN,1,sKey,sHas,medA,medB,medC));
-      if(expanded[sKey]){ sortKids(sN.kids).forEach(function(aK){ out.push(treeRow(sN.kids[aK],2,sKey+'|a:'+aK,false,medA,medB,medC)); }); } }); } });
+  order.forEach(function(cK){ var c=camps[cK],cKey='c:'+cK,cHas=Object.keys(c.kids).length>0; out.push(treeRow(c,0,cKey,cHas,medA,medB,medC,medL));
+    if(expanded[cKey]){ sortKids(c.kids).forEach(function(sK){ var sN=c.kids[sK],sKey=cKey+'|s:'+sK,sHas=Object.keys(sN.kids).length>0; out.push(treeRow(sN,1,sKey,sHas,medA,medB,medC,medL));
+      if(expanded[sKey]){ sortKids(sN.kids).forEach(function(aK){ out.push(treeRow(sN.kids[aK],2,sKey+'|a:'+aK,false,medA,medB,medC,medL)); }); } }); } });
   if(!out.length) out.push('<tr><td colspan="'+TREECOLS.length+'" class="empty">Sem dados no período.</td></tr>');
   el('treeTbl').innerHTML=head+'<tbody>'+out.join('')+'</tbody>';
   el('treeLegend').innerHTML='<span><b class="cA">A</b> perseguir · <b class="cB">B</b> miolo · <b class="cC">C</b> cortar</span>'
     +'<span><span class="act act-acel">Acelerar</span> Lead A barato</span>'
     +'<span><span class="act act-rev">Pausar</span> Lead C em massa / A caro</span>'
-    +'<span style="color:var(--muted2)"><b>Custo Lead A</b> colorido vs. mediana (verde = A barato = perseguir) · '+sortLabel()+' · clique nos títulos p/ ordenar</span>';
+    +'<span style="color:var(--muted2)"><b>CPL</b> colorido vs. mediana (verde = CPL barato) · Lead A/B/C seguem à vista p/ leadscoring · '+sortLabel()+' · clique nos títulos p/ ordenar</span>';
   Array.prototype.forEach.call(el('treeTbl').querySelectorAll('tr.parent'),function(tr){
     tr.addEventListener('click',function(){ var k=decodeURIComponent(tr.getAttribute('data-key')); expanded[k]=!expanded[k]; renderTree(rangeFor(period)); }); });
   Array.prototype.forEach.call(el('treeTbl').querySelectorAll('th.sortable'),function(th){
@@ -916,7 +918,7 @@ function mountMicro(){
       return '<tr class="'+(drillable?'mrow':'')+'" data-key="'+encodeURIComponent(g.key)+'">'
         +'<td><span class="mname">'+(drillable?'<span class="mcaret">▸</span> ':'')+esc(prettyName(g.key))+'</span></td>'
         +'<td class="num">'+money0(g.spend)+'</td><td class="num">'+intf(g.leads)+'</td>'
-        +'<td class="num">'+(cpl!=null?money0(cpl):'—')+'</td>'
+        +'<td class="num">'+(cpl!=null?money(cpl):'—')+'</td>'
         +'<td class="num"><b class="cA">'+intf(g.la)+'</b></td>'
         +'<td class="num">'+(cpla!=null?money0(cpla):'—')+'</td>'
         +'<td class="num">'+trendBadge(gt,false)+'</td>'
