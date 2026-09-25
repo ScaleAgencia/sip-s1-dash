@@ -941,8 +941,9 @@ function mountMicro(){
 /* =================== FUNIL S · V2 — OTIMIZAÇÃO 100% FILTRÁVEL (padrão "captura meta ads") ===================
    Diferencial: clicar em QUALQUER item (campanha/conjunto/anúncio) filtra a aba INTEIRA (KPIs + gráficos +
    tabelas) só pra ele, e a lista continua visível — dá pra trocar clicando em outro (sem drill destrutivo). */
-var v2Sel={camp:null,adset:null,ad:null}, v2Period='tudo';
+var v2Sel={camp:null,adset:null,ad:null}, v2Period='tudo', v2Channel='geral';
 var V2PAL=['#22d3ee','#f5b041','#a99bf7','#34d399','#f2637e','#67e8f9','#fb923c','#c084fc','#60a5fa','#f472b6'];
+function v2ChMatch(r){ return v2Channel==='geral' || r.channel===v2Channel; }
 function v2RangeFor(k){ var mx=maxDate;
   if(k==='7d') return [addDays(mx,-6),mx];
   if(k==='14d')return [addDays(mx,-13),mx];
@@ -1021,12 +1022,25 @@ function v2Lines(groups,elId,level,onPick){
     pts.forEach(function(p){ s+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.1" fill="'+col+'"/>'; });
   });
   xticks(dates.map(function(d){return {date:d};})).forEach(function(i){ s+='<text x="'+xf(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" fill="#586a8c" font-size="9">'+fmtBR(dates[i])+'</text>'; });
+  // bandas invisíveis por data p/ hover (mostra o CPL de cada item naquele dia)
+  var bandW = n>1? pw/(n-1) : pw;
+  dates.forEach(function(dt,i){ var x=xf(i)-bandW/2; if(x<pl)x=pl; s+='<rect class="v2hit" data-i="'+i+'" x="'+x.toFixed(1)+'" y="'+pt+'" width="'+bandW.toFixed(1)+'" height="'+ph+'" fill="transparent" pointer-events="all"/>'; });
   s+='</svg>';
   var legend=top.map(function(g,gi){ var col=V2PAL[gi%V2PAL.length]; var nm=g.name.length>36?g.name.slice(0,34)+'…':g.name;
     return '<span class="v2leg'+(v2SelOf(g,level)?' on':'')+'" data-key="'+encodeURIComponent(g.key)+'"><span class="dot" style="background:'+col+'"></span>'+esc(nm)+'</span>'; }).join('');
   el(elId).innerHTML='<div class="chart">'+s+'</div><div class="chart-legend wrap v2legwrap">'+legend+'</div>';
   var byKey={}; top.forEach(function(g){ byKey[g.key]=g; });
   Array.prototype.forEach.call(el(elId).querySelectorAll('.v2leg'),function(sp){ sp.addEventListener('click',function(){ var g=byKey[decodeURIComponent(sp.getAttribute('data-key'))]; if(g) onPick(g); }); });
+  // tooltip no hover: lista o CPL de cada linha naquele dia (ordenado do mais barato)
+  Array.prototype.forEach.call(el(elId).querySelectorAll('.v2hit'),function(r){
+    r.addEventListener('mousemove',function(e){ var i=+r.getAttribute('data-i'), dt=dates[i];
+      var items=[]; top.forEach(function(g,gi){ var d=g.map[dt]; if(d&&d.leads>0) items.push({nm:g.name,cpl:d.spend/d.leads,leads:d.leads,col:V2PAL[gi%V2PAL.length]}); });
+      items.sort(function(a,b){return a.cpl-b.cpl;});
+      var html='<div class="tt-d">'+fmtBR(dt)+'</div>';
+      if(!items.length){ html+='<div class="tt-sub">sem leads nesse dia</div>'; }
+      else items.forEach(function(it){ var nm=it.nm.length>28?it.nm.slice(0,26)+'…':it.nm; html+='<div class="tt-r"><span style="color:'+it.col+'">'+esc(nm)+'</span><b>'+money(it.cpl)+'</b></div>'; });
+      tipShow(html,e.clientX,e.clientY); });
+    r.addEventListener('mouseleave',tipHide); });
 }
 function v2Table(elId,title,hint,list,level){
   if(!el(elId)) return;
@@ -1065,12 +1079,16 @@ function v2CrumbHTML(){
 function mountV2(){
   if(!el('v2Wrap')) return;
   var rng=v2RangeFor(v2Period);
-  var base=grain.filter(function(r){ return isDate(r.date)&&inRange(r.date,rng)&&chMatch(r)&&faseMatch(r); });
-  // barra de período + limpar
+  var base=grain.filter(function(r){ return isDate(r.date)&&inRange(r.date,rng)&&v2ChMatch(r)&&faseMatch(r); });
+  // barra de período + canal + limpar
   var PW=[{k:'7d',l:'7 dias'},{k:'14d',l:'14 dias'},{k:'30d',l:'30 dias'},{k:'tudo',l:'Tudo'}];
+  var CH=[{k:'geral',l:'Geral'},{k:'meta',l:'Meta'},{k:'google',l:'Google'}];
   var clr=(v2Sel.camp!=null||v2Sel.adset!=null||v2Sel.ad!=null)?'<button class="v2clr" id="v2Clear">✕ limpar filtro</button>':'';
-  el('v2Periods').innerHTML='<span class="pf-h">Período:</span>'+PW.map(function(w){return '<button data-k="'+w.k+'" class="pbtn'+(v2Period===w.k?' on':'')+'">'+w.l+'</button>';}).join('')+clr;
-  Array.prototype.forEach.call(el('v2Periods').querySelectorAll('.pbtn'),function(b){ b.addEventListener('click',function(){ v2Period=b.getAttribute('data-k'); mountV2(); }); });
+  el('v2Periods').innerHTML='<span class="pf-h">Período:</span>'+PW.map(function(w){return '<button data-k="'+w.k+'" class="pbtn'+(v2Period===w.k?' on':'')+'">'+w.l+'</button>';}).join('')
+    +'<span class="pf-h pf-ch">Canal:</span>'+CH.map(function(c){return '<button data-ch="'+c.k+'" class="pbtn'+(v2Channel===c.k?' on':'')+'">'+c.l+'</button>';}).join('')
+    +clr;
+  Array.prototype.forEach.call(el('v2Periods').querySelectorAll('.pbtn[data-k]'),function(b){ b.addEventListener('click',function(){ v2Period=b.getAttribute('data-k'); mountV2(); }); });
+  Array.prototype.forEach.call(el('v2Periods').querySelectorAll('.pbtn[data-ch]'),function(b){ b.addEventListener('click',function(){ v2Channel=b.getAttribute('data-ch'); mountV2(); }); });
   if(el('v2Clear')) el('v2Clear').addEventListener('click',function(){ v2Sel={camp:null,adset:null,ad:null}; mountV2(); });
   // breadcrumb do filtro
   el('v2Crumb').innerHTML=v2CrumbHTML();
@@ -1375,7 +1393,7 @@ function switchFunnel(key){
   profPeriod='tudo'; profSrc=-1; profMed=-1; profCamp=-1; fase='all'; acompWin=7;
   microPath=[]; microMetric='leads'; microPeriod='tudo';
   qualPeriod='tudo'; engPeriod='tudo'; engCustom=null;
-  v2Sel={camp:null,adset:null,ad:null}; v2Period='tudo';
+  v2Sel={camp:null,adset:null,ad:null}; v2Period='tudo'; v2Channel='geral';
   initFases(); initPeriods(); initEngPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountV2(); mountAquec(); mountQualidade(); syncL21Tabs();
   if(history.replaceState){ history.replaceState(null,'', location.pathname+'?funnel='+key+(location.hash||'')); }
 }

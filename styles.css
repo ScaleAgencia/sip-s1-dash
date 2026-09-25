@@ -442,6 +442,7 @@ a.v2crumb:hover{background:rgba(34,211,238,.12)}
 .v2legwrap .v2leg{cursor:pointer;padding:2px 7px;border-radius:20px;border:1px solid transparent;transition:.12s}
 .v2legwrap .v2leg:hover{background:rgba(255,255,255,.05)}
 .v2legwrap .v2leg.on{border-color:var(--cy,#22d3ee);background:rgba(34,211,238,.12);font-weight:700}
+.pf-ch{margin-left:16px}
 /* micro 100% filtrável: linha selecionada */
 tr.mrow.sel{background:rgba(34,211,238,.14);box-shadow:inset 3px 0 0 var(--cy,#22d3ee)}
 tr.mrow.sel .mname{color:var(--cy,#22d3ee);font-weight:700}
