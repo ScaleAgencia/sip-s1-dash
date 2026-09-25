@@ -954,7 +954,7 @@ function v2Metrics(n){ var q=(n.la||0)+(n.lb||0)+(n.lc||0); return {
   spend:n.spend,impr:n.impr,clicks:n.clicks,lpv:n.lpv,leads:n.leads,la:n.la,lb:n.lb,lc:n.lc,
   cpm:n.impr>0?n.spend/n.impr*1000:null, ctr:n.impr>0?n.clicks/n.impr*100:null, cpc:n.clicks>0?n.spend/n.clicks:null,
   cpl:n.leads>0?n.spend/n.leads:null, cpv:n.lpv>0?n.spend/n.lpv:null, convLP:n.lpv>0?n.leads/n.lpv*100:null,
-  convPag:n.clicks>0?n.leads/n.clicks*100:null, cpla:n.la>0?n.spend/n.la:null, pctA:q>0?n.la/q*100:null }; }
+  convPag:n.clicks>0?n.leads/n.clicks*100:null, convQual:n.clicks>0?n.la/n.clicks*100:null, cpla:n.la>0?n.spend/n.la:null, pctA:q>0?n.la/q*100:null }; }
 function v2groupBy(rows,level){ var g={};
   rows.forEach(function(r){
     var key = level===0? r.campaign : (level===1? r.campaign+'\u0001'+r.adset : r.campaign+'\u0001'+r.adset+'\u0001'+r.ad);
@@ -1049,7 +1049,7 @@ function v2Table(elId,title,hint,list,level){
   var shown=list.slice(0,80);
   var medL=median(shown.map(function(o){return o.leads>0?o.spend/o.leads:null;}).filter(function(x){return x!=null;}));
   var lvlLab=['Campanha','Conjunto / Grupo','Anúncio'][level];
-  var head='<thead><tr><th>'+lvlLab+'</th><th class="num">Gasto</th><th class="num">Impr.</th><th class="num">CPM</th><th class="num">Cliques</th><th class="num">CTR</th><th class="num">CPC</th><th class="num">Leads</th><th class="num">CPL</th><th class="num">Lead A</th><th class="num">Custo Lead A</th><th class="num">% A</th></tr></thead>';
+  var head='<thead><tr><th>'+lvlLab+'</th><th class="num">Gasto</th><th class="num">Impr.</th><th class="num">CPM</th><th class="num">Cliques</th><th class="num">CTR</th><th class="num">CPC</th><th class="num">Leads</th><th class="num">CPL</th><th class="num">Conv. pág.</th><th class="num">Lead A</th><th class="num">Custo Lead A</th><th class="num">% A</th><th class="num">Conv. qualif.</th></tr></thead>';
   var body=shown.map(function(o){ var m=v2Metrics(o), sel=v2SelOf(o,level);
     var cplCell=m.cpl!=null?'<span class="cpl-pill '+relClass(m.cpl,medL)+'">'+money(m.cpl)+'</span>':'—';
     return '<tr class="v2row'+(sel?' sel':'')+'" data-key="'+encodeURIComponent(o.key)+'">'
@@ -1062,9 +1062,11 @@ function v2Table(elId,title,hint,list,level){
       +'<td class="num">'+(m.cpc!=null?money(m.cpc):'—')+'</td>'
       +'<td class="num">'+intf(o.leads)+'</td>'
       +'<td class="num">'+cplCell+'</td>'
+      +'<td class="num">'+(m.convPag!=null?pct(m.convPag):'—')+'</td>'
       +'<td class="num"><b class="cA">'+intf(o.la)+'</b></td>'
       +'<td class="num">'+(m.cpla!=null?money0(m.cpla):'—')+'</td>'
-      +'<td class="num">'+(m.pctA!=null?pct(m.pctA):'—')+'</td></tr>'; }).join('');
+      +'<td class="num">'+(m.pctA!=null?pct(m.pctA):'—')+'</td>'
+      +'<td class="num">'+(m.convQual!=null?pct(m.convQual):'—')+'</td></tr>'; }).join('');
   var more = list.length>shown.length ? ' <span class="hint">· mostrando top '+shown.length+' de '+list.length+' por gasto</span>' : '';
   el(elId).innerHTML='<div class="card"><div class="card-h">'+title+' <span class="hint">'+hint+'</span>'+more+'</div><div class="table-scroll"><table class="tbl v2tbl">'+head+'<tbody>'+body+'</tbody></table></div></div>';
   var byKey={}; shown.forEach(function(o){ byKey[o.key]=o; });
@@ -1103,16 +1105,18 @@ function mountV2(){
   // gráficos reativos
   var days=seriesByDate(scope);
   if(days.length) v2DailyChart(days,'v2Daily'); else el('v2Daily').innerHTML='<div class="empty">Sem dados no período.</div>';
-  var mlLevel = v2Sel.ad!=null?2:(v2Sel.adset!=null?2:(v2Sel.camp!=null?1:0));
-  var mlGroups=v2groupBy(scope, mlLevel);
-  v2Lines(mlGroups,'v2Lines',mlLevel,function(g){ v2Pick(mlLevel,g); });
-  el('v2LinesTitle').textContent = v2Sel.adset!=null?'CPL por dia · por anúncio' : (v2Sel.camp!=null?'CPL por dia · por conjunto' : 'CPL por dia · por campanha');
-  // tabelas (sempre visíveis → trocar de item é só clicar em outro)
-  v2Table('v2TCamp','Campanhas','clique numa linha p/ filtrar tudo · clique de novo p/ limpar', v2groupBy(base,0), 0);
+  // cada nível: TABELA + gráfico "CPL por dia" LOGO ABAIXO (top 8 por gasto · legenda clicável p/ filtrar · hover mostra o CPL do dia)
+  var campG=v2groupBy(base,0);
+  v2Table('v2TCamp','Campanhas','clique numa linha p/ filtrar tudo · clique de novo p/ limpar', campG, 0);
+  v2Lines(campG,'v2LinesCamp',0,function(g){ v2Pick(0,g); });
   var conjRows = v2Sel.camp!=null? base.filter(function(r){return r.campaign===v2Sel.camp;}) : base;
-  v2Table('v2TAdset','Conjuntos / Grupos', v2Sel.camp!=null?'da campanha selecionada':'todos · selecione uma campanha p/ focar', v2groupBy(conjRows,1), 1);
+  var conjG=v2groupBy(conjRows,1);
+  v2Table('v2TAdset','Conjuntos / Grupos', v2Sel.camp!=null?'da campanha selecionada':'todos · selecione uma campanha p/ focar', conjG, 1);
+  v2Lines(conjG,'v2LinesAdset',1,function(g){ v2Pick(1,g); });
   var adRows = v2Sel.adset!=null? base.filter(function(r){return r.campaign===v2Sel.camp&&r.adset===v2Sel.adset;}) : (v2Sel.camp!=null? base.filter(function(r){return r.campaign===v2Sel.camp;}) : base);
-  v2Table('v2TAd','Anúncios', v2Sel.adset!=null?'do conjunto selecionado':(v2Sel.camp!=null?'da campanha selecionada':'todos'), v2groupBy(adRows,2), 2);
+  var adG=v2groupBy(adRows,2);
+  v2Table('v2TAd','Anúncios', v2Sel.adset!=null?'do conjunto selecionado':(v2Sel.camp!=null?'da campanha selecionada':'todos'), adG, 2);
+  v2Lines(adG,'v2LinesAd',2,function(g){ v2Pick(2,g); });
 }
 
 /* =================== ACOMPANHAMENTO GERAL (saúde da captação · foco Lead A) =================== */
