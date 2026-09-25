@@ -47,6 +47,7 @@
   <nav class="tabs" id="tabs">
     <button class="tab active" data-tab="funil">Funil &amp; Otimização</button>
     <button class="tab" data-tab="micro">Otimização micro</button>
+    <button class="tab tab-s1only" data-tab="v2" style="display:none">🎯 Funil S · V2 Otimização</button>
     <button class="tab" data-tab="leads">Leads · Visão Geral</button>
     <button class="tab" data-tab="perfil">Perfil do Lead</button>
     <button class="tab" data-tab="acomp">Acompanhamento geral</button>
@@ -164,6 +165,26 @@
         <div id="microChart"></div>
       </div>
       <div id="microTable"></div>
+    </div>
+  </section>
+
+  <!-- ============ FUNIL S · V2 OTIMIZAÇÃO (s1 only · 100% filtrável) ============ -->
+  <section class="panel-tab hidden" id="tab-v2">
+    <div id="v2Wrap">
+      <div class="v2bar">
+        <div class="prof-periods" id="v2Periods"></div>
+        <div class="v2crumbwrap"><span class="v2crumb-lab">Filtro:</span> <span id="v2Crumb"></span></div>
+      </div>
+      <div class="funil-grid">
+        <div class="kpi-col" id="v2Kpi"></div>
+        <div class="chart-col">
+          <div class="card"><div class="card-h">Combinação diária <span class="hint">barras = leads/dia · linha âmbar = CPL/dia · reage 100% ao filtro selecionado</span></div><div id="v2Daily"></div></div>
+          <div class="card"><div class="card-h" id="v2LinesTitle">CPL por dia · por campanha</div><div class="hint" style="margin:-4px 0 6px 2px">clique numa legenda p/ filtrar aquele item · desce um nível (campanha → conjunto → anúncio)</div><div id="v2Lines"></div></div>
+        </div>
+      </div>
+      <div id="v2TCamp"></div>
+      <div id="v2TAdset"></div>
+      <div id="v2TAd"></div>
     </div>
   </section>
 

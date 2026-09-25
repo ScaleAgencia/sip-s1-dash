@@ -905,29 +905,195 @@ function mountMicro(){
     +' <span class="mv-hint">(início vs fim do período)</span></div>'
     +'<div class="mverdict mv-act">Ação <span class="mv-hint">(por volume + custo de Lead A)</span> — '+actionBadge(act)+' <span class="mv-why">'+esc(act.why)+'</span></div>';
   microChart(days,microMetric);
-  // tabela do próximo nível (filhos)
-  var level=microPath.length, ck=['campaign','adset','ad'][level], drillable=level<2;
-  var lvlLab=['Campanha','Conjunto / Grupo','Anúncio'][level] || 'Anúncio';
-  var tbl='';
-  if(!ck){ tbl='<div class="card"><div class="empty">Nível de anúncio — sem mais drill-down. Veja a tendência acima.</div></div>'; }
-  else {
-    var groups={}; rows.forEach(function(r){ var key=r[ck]; if(key==null)return; var g=groups[key]||(groups[key]={key:key,spend:0,leads:0,la:0,clicks:0,impr:0,rows:[]}); g.spend+=r.spend||0;g.leads+=r.leads||0;g.la+=r.la||0;g.clicks+=r.clicks||0;g.impr+=r.impr||0; g.rows.push(r); });
-    var list=Object.keys(groups).map(function(key){return groups[key];}).sort(function(a,b){return b.leads-a.leads;});
-    var head='<thead><tr><th>'+lvlLab+'</th><th class="num">Invest.</th><th class="num">Leads</th><th class="num">CPL</th><th class="num">Lead A</th><th class="num">Custo Lead A</th><th class="num">Tendência ('+meta.lab+')</th><th class="num">Ação</th></tr></thead>';
-    var body=list.map(function(g){ var cpl=g.leads>0?dv(g.spend,g.leads):null, cpla=g.la>0?dv(g.spend,g.la):null, gd=seriesByDate(g.rows), gt=microTrend(gd,microMetric,meta.hb), ga=microAction(gd);
-      return '<tr class="'+(drillable?'mrow':'')+'" data-key="'+encodeURIComponent(g.key)+'">'
-        +'<td><span class="mname">'+(drillable?'<span class="mcaret">▸</span> ':'')+esc(prettyName(g.key))+'</span></td>'
+  // ---- tabelas por nível · 100% FILTRÁVEL: cada nível fica VISÍVEL; clicar num item filtra tudo p/ ele
+  // e troca com 1 clique (sem drill destrutivo). Clicar no já-selecionado limpa aquele nível. ----
+  function microLevelTbl(level){
+    var ckk=['campaign','adset','ad'][level], lab=['Campanha','Conjunto / Grupo','Anúncio'][level];
+    var scoped=grain.filter(function(r){ return isDate(r.date)&&inRange(r.date,rng)&&faseMatch(r)
+      && (level<1||r.campaign===microPath[0]) && (level<2||r.adset===microPath[1]); });
+    var G={}; scoped.forEach(function(r){ var key=r[ckk]; if(key==null)return; var g=G[key]||(G[key]={key:key,spend:0,leads:0,la:0,lb:0,lc:0,clicks:0,impr:0,rows:[]}); g.spend+=r.spend||0;g.leads+=r.leads||0;g.la+=r.la||0;g.lb+=r.lb||0;g.lc+=r.lc||0;g.clicks+=r.clicks||0;g.impr+=r.impr||0; g.rows.push(r); });
+    var list=Object.keys(G).map(function(k){return G[k];}).sort(function(a,b){return b.leads-a.leads;});
+    var shown=list.slice(0,80), medL=median(shown.map(function(g){return g.leads>0?g.spend/g.leads:null;}).filter(function(x){return x!=null;}));
+    var head='<thead><tr><th>'+lab+'</th><th class="num">Invest.</th><th class="num">Leads</th><th class="num">CPL</th><th class="num">Lead A</th><th class="num">Custo Lead A</th><th class="num">% A</th><th class="num">Tendência ('+meta.lab+')</th><th class="num">Ação</th></tr></thead>';
+    var body=shown.map(function(g){ var cpl=g.leads>0?dv(g.spend,g.leads):null, cpla=g.la>0?dv(g.spend,g.la):null, q=g.la+g.lb+g.lc, gd=seriesByDate(g.rows), gt=microTrend(gd,microMetric,meta.hb), ga=microAction(gd), seld=(microPath[level]===g.key);
+      return '<tr class="mrow'+(seld?' sel':'')+'" data-lvl="'+level+'" data-key="'+encodeURIComponent(g.key)+'">'
+        +'<td><span class="mname">'+(seld?'● ':'<span class="mcaret">▸</span> ')+esc(prettyName(g.key))+'</span></td>'
         +'<td class="num">'+money0(g.spend)+'</td><td class="num">'+intf(g.leads)+'</td>'
-        +'<td class="num">'+(cpl!=null?money(cpl):'—')+'</td>'
+        +'<td class="num">'+(cpl!=null?'<span class="cpl-pill '+relClass(cpl,medL)+'">'+money(cpl)+'</span>':'—')+'</td>'
         +'<td class="num"><b class="cA">'+intf(g.la)+'</b></td>'
         +'<td class="num">'+(cpla!=null?money0(cpla):'—')+'</td>'
+        +'<td class="num">'+(q>0?pct(g.la/q*100):'—')+'</td>'
         +'<td class="num">'+trendBadge(gt,false)+'</td>'
         +'<td class="num">'+actionBadge(ga)+'</td></tr>'; }).join('');
-    if(!list.length) body='<tr><td colspan="8" class="empty">Sem dados no período.</td></tr>';
-    tbl='<div class="card"><div class="card-h">Detalhe por '+lvlLab+(drillable?' <span class="hint">clique numa linha p/ abrir o próximo nível</span>':' <span class="hint">nível final</span>')+'</div><div class="table-scroll"><table class="tbl" id="microTbl">'+head+'<tbody>'+body+'</tbody></table></div></div>';
+    if(!shown.length) body='<tr><td colspan="9" class="empty">Sem dados no período.</td></tr>';
+    var more=list.length>shown.length?' <span class="hint">· top '+shown.length+' de '+list.length+'</span>':'';
+    var sub = level===0?'clique p/ filtrar tudo por essa campanha · clique em outra p/ trocar':(level===1?'conjuntos da campanha selecionada':'anúncios do conjunto selecionado');
+    return '<div class="card"><div class="card-h">'+lab+'s <span class="hint">'+sub+'</span>'+more+'</div><div class="table-scroll"><table class="tbl v2tbl">'+head+'<tbody>'+body+'</tbody></table></div></div>';
   }
-  el('microTable').innerHTML=tbl;
-  Array.prototype.forEach.call(document.querySelectorAll('#microTable .mrow'),function(tr){ tr.addEventListener('click',function(){ microPath=microPath.concat([decodeURIComponent(tr.getAttribute('data-key'))]); mountMicro(); }); });
+  var lvlOut=''; for(var L=0; L<=Math.min(2,microPath.length); L++){ lvlOut+=microLevelTbl(L); }
+  el('microTable').innerHTML=lvlOut;
+  Array.prototype.forEach.call(el('microTable').querySelectorAll('.mrow'),function(tr){ tr.addEventListener('click',function(){
+    var lv=+tr.getAttribute('data-lvl'), key=decodeURIComponent(tr.getAttribute('data-key'));
+    microPath = (microPath[lv]===key)? microPath.slice(0,lv) : microPath.slice(0,lv).concat([key]);
+    mountMicro(); }); });
+}
+
+/* =================== FUNIL S · V2 — OTIMIZAÇÃO 100% FILTRÁVEL (padrão "captura meta ads") ===================
+   Diferencial: clicar em QUALQUER item (campanha/conjunto/anúncio) filtra a aba INTEIRA (KPIs + gráficos +
+   tabelas) só pra ele, e a lista continua visível — dá pra trocar clicando em outro (sem drill destrutivo). */
+var v2Sel={camp:null,adset:null,ad:null}, v2Period='tudo';
+var V2PAL=['#22d3ee','#f5b041','#a99bf7','#34d399','#f2637e','#67e8f9','#fb923c','#c084fc','#60a5fa','#f472b6'];
+function v2RangeFor(k){ var mx=maxDate;
+  if(k==='7d') return [addDays(mx,-6),mx];
+  if(k==='14d')return [addDays(mx,-13),mx];
+  if(k==='30d')return [addDays(mx,-29),mx];
+  return [minDate,maxDate]; }
+function v2Metrics(n){ var q=(n.la||0)+(n.lb||0)+(n.lc||0); return {
+  spend:n.spend,impr:n.impr,clicks:n.clicks,lpv:n.lpv,leads:n.leads,la:n.la,lb:n.lb,lc:n.lc,
+  cpm:n.impr>0?n.spend/n.impr*1000:null, ctr:n.impr>0?n.clicks/n.impr*100:null, cpc:n.clicks>0?n.spend/n.clicks:null,
+  cpl:n.leads>0?n.spend/n.leads:null, cpv:n.lpv>0?n.spend/n.lpv:null, convLP:n.lpv>0?n.leads/n.lpv*100:null,
+  convPag:n.clicks>0?n.leads/n.clicks*100:null, cpla:n.la>0?n.spend/n.la:null, pctA:q>0?n.la/q*100:null }; }
+function v2groupBy(rows,level){ var g={};
+  rows.forEach(function(r){
+    var key = level===0? r.campaign : (level===1? r.campaign+'\u0001'+r.adset : r.campaign+'\u0001'+r.adset+'\u0001'+r.ad);
+    var o=g[key]; if(!o){ o=g[key]=newNode(prettyName(level===0?r.campaign:(level===1?r.adset:r.ad)),key); o.key=key; o.camp=r.campaign; o.adset=r.adset; o.ad=r.ad; o.rows=[]; }
+    accum(o,r); o.rows.push(r);
+  });
+  return Object.keys(g).map(function(k){return g[k];}).sort(function(a,b){return b.spend-a.spend;}); }
+function v2SelOf(o,level){ return level===0? (v2Sel.camp===o.camp) : (level===1? (v2Sel.camp===o.camp&&v2Sel.adset===o.adset) : (v2Sel.camp===o.camp&&v2Sel.adset===o.adset&&v2Sel.ad===o.ad)); }
+function v2Pick(level,o){
+  if(level===0){ v2Sel = (v2Sel.camp===o.camp)?{camp:null,adset:null,ad:null}:{camp:o.camp,adset:null,ad:null}; }
+  else if(level===1){ var s1=(v2Sel.camp===o.camp&&v2Sel.adset===o.adset); v2Sel = s1?{camp:o.camp,adset:null,ad:null}:{camp:o.camp,adset:o.adset,ad:null}; }
+  else { var s2=(v2Sel.camp===o.camp&&v2Sel.adset===o.adset&&v2Sel.ad===o.ad); v2Sel = s2?{camp:o.camp,adset:o.adset,ad:null}:{camp:o.camp,adset:o.adset,ad:o.ad}; }
+  mountV2();
+}
+function v2Kpis(m){
+  var hero='<div class="kpi-hero"><div class="h-lab">Investimento <small>(Meta c/ imposto + Google s/)</small></div>'
+    +'<div class="h-val">'+money(m.spend)+'</div>'
+    +'<div class="h-foot"><span>CPL <b>'+(m.cpl!=null?money(m.cpl):'—')+'</b></span><span>Leads <b>'+intf(m.leads)+'</b></span></div></div>';
+  var cards='';
+  cards+=kpiCard(false,'Impressões',intf(m.impr), subRow('CPM <small>(custo/mil)</small>',(m.cpm!=null?money(m.cpm):'—'),''));
+  cards+=kpiCard(false,'Cliques',intf(m.clicks), subRow('CTR',(m.ctr!=null?pct(m.ctr):'—'),'')+subRow('CPC',(m.cpc!=null?money(m.cpc):'—'),''));
+  cards+=kpiCard(false,'Visitas na LP <small>(Meta)</small>',intf(m.lpv), subRow('ConvLP <small>(lead/visita)</small>',(m.convLP!=null?pct(m.convLP):'—'),'')+subRow('CPV',(m.cpv!=null?money(m.cpv):'—'),''));
+  cards+=kpiCard(true,'Leads',intf(m.leads), subRow('<b>CPL</b>',(m.cpl!=null?money(m.cpl):'—'),'')+subRow('Conv. página <small>(clique→lead)</small>',(m.convPag!=null?pct(m.convPag):'—'),''));
+  cards+='<div class="kpi-card acard"><div class="kpi-main"><div class="m-lab">Lead A <span class="qtag">leadscoring</span></div><div class="m-val">'+intf(m.la)+'</div></div><div class="kpi-sub">'
+    +subRow('<b>Custo por Lead A</b>',(m.cpla!=null?money(m.cpla):'—'),'')
+    +subRow('% Lead A',(m.pctA!=null?pct(m.pctA):'—'),'')
+    +subRow('Mix A·B·C','<b class="cA">'+intf(m.la)+'</b> · <b class="cB">'+intf(m.lb)+'</b> · <b class="cC">'+intf(m.lc)+'</b>','')
+    +'</div></div>';
+  return hero+cards;
+}
+function v2DailyChart(days,elId){
+  if(!el(elId)) return;
+  var W=820,H=210,pl=40,pr=46,pt=14,pb=24,pw=W-pl-pr,ph=H-pt-pb,base=pt+ph;
+  var maxL=Math.max.apply(null,days.map(function(d){return d.leads||0;}).concat([1]));
+  var cpls=days.map(function(d){return d.leads>0?dv(d.spend,d.leads):null;});
+  var maxC=Math.max.apply(null,cpls.filter(function(x){return x!=null;}).concat([1]));
+  var n=days.length||1,gw=pw/n,bw=Math.max(3,Math.min(24,gw*0.6));
+  var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
+  [0,0.5,1].forEach(function(f){ var y=pt+ph*(1-f); s+='<line x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'" stroke="#182034" stroke-dasharray="2 3"/>';
+    s+='<text x="'+(pl-4)+'" y="'+(y+3)+'" text-anchor="end" fill="#586a8c" font-size="9">'+Math.round(maxL*f)+'</text>';
+    s+='<text x="'+(W-pr+4)+'" y="'+(y+3)+'" text-anchor="start" fill="#c98a2a" font-size="9">'+money0(maxC*f)+'</text>'; });
+  days.forEach(function(d,i){ var xc=pl+gw*i+gw/2, h=ph*dv(d.leads,maxL); if(d.leads>0) s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-h).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="1.5" fill="rgba(34,211,238,.34)"/>'; });
+  var pts=[]; days.forEach(function(d,i){ if(cpls[i]!=null){ pts.push([pl+gw*i+gw/2, base-ph*dv(cpls[i],maxC)]); } });
+  if(pts.length>1){ s+='<path d="M'+pts.map(function(p){return p[0].toFixed(1)+' '+p[1].toFixed(1);}).join(' L')+'" fill="none" stroke="'+COL.warn+'" stroke-width="2"/>'; }
+  pts.forEach(function(p){ s+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.4" fill="'+COL.warn+'"/>'; });
+  xticks(days).forEach(function(i){ var xc=pl+gw*i+gw/2; s+='<text x="'+xc.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" fill="#586a8c" font-size="9">'+fmtBR(days[i].date)+'</text>'; });
+  s+=hitRects(days,pl,gw,pt,ph)+'</svg>';
+  el(elId).innerHTML='<div class="chart">'+s+'</div><div class="chart-legend"><span><span class="dot" style="background:rgba(34,211,238,.55)"></span>Leads/dia</span><span><span class="ln" style="background:'+COL.warn+'"></span>CPL/dia</span></div>';
+  bindHits(elId,days,function(d){ return '<div class="tt-d">'+fmtBR(d.date)+'</div><div class="tt-r"><span>Leads</span><b>'+intf(d.leads)+'</b></div><div class="tt-r"><span style="color:'+COL.warn+'">CPL</span><b>'+(d.leads>0?money(dv(d.spend,d.leads)):'—')+'</b></div><div class="tt-sub">Invest. '+money0(d.spend)+' · Lead A '+intf(d.la)+'</div>'; });
+}
+function v2Lines(groups,elId,level,onPick){
+  if(!el(elId)) return;
+  var top=groups.slice(0,8);
+  top.forEach(function(g){ g.series=seriesByDate(g.rows); var mp={}; g.series.forEach(function(d){mp[d.date]=d;}); g.map=mp; });
+  var dset={}; top.forEach(function(g){ g.series.forEach(function(d){ if(d.leads>0) dset[d.date]=1; }); });
+  var dates=Object.keys(dset).sort();
+  if(!dates.length){ el(elId).innerHTML='<div class="empty">Sem CPL no período p/ traçar as linhas.</div>'; return; }
+  var maxC=1; top.forEach(function(g){ g.series.forEach(function(d){ if(d.leads>0){ var c=d.spend/d.leads; if(c>maxC)maxC=c; } }); });
+  var W=820,H=240,pl=44,pr=14,pt=14,pb=26,pw=W-pl-pr,ph=H-pt-pb,base=pt+ph;
+  var n=dates.length; function xf(i){ return pl+(n>1?pw/(n-1)*i:pw/2); } function yf(c){ return base-ph*Math.max(0,Math.min(1,c/maxC)); }
+  var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
+  [0,0.5,1].forEach(function(f){ var y=pt+ph*(1-f); s+='<line x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'" stroke="#182034" stroke-dasharray="2 3"/>'; s+='<text x="'+(pl-4)+'" y="'+(y+3)+'" text-anchor="end" fill="#586a8c" font-size="9">'+money0(maxC*f)+'</text>'; });
+  top.forEach(function(g,gi){ var col=V2PAL[gi%V2PAL.length], pts=[];
+    dates.forEach(function(dt,i){ var d=g.map[dt]; if(d&&d.leads>0) pts.push([xf(i),yf(d.spend/d.leads)]); });
+    if(pts.length>1) s+='<path d="M'+pts.map(function(p){return p[0].toFixed(1)+' '+p[1].toFixed(1);}).join(' L')+'" fill="none" stroke="'+col+'" stroke-width="2" opacity=".92"/>';
+    pts.forEach(function(p){ s+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.1" fill="'+col+'"/>'; });
+  });
+  xticks(dates.map(function(d){return {date:d};})).forEach(function(i){ s+='<text x="'+xf(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" fill="#586a8c" font-size="9">'+fmtBR(dates[i])+'</text>'; });
+  s+='</svg>';
+  var legend=top.map(function(g,gi){ var col=V2PAL[gi%V2PAL.length]; var nm=g.name.length>36?g.name.slice(0,34)+'…':g.name;
+    return '<span class="v2leg'+(v2SelOf(g,level)?' on':'')+'" data-key="'+encodeURIComponent(g.key)+'"><span class="dot" style="background:'+col+'"></span>'+esc(nm)+'</span>'; }).join('');
+  el(elId).innerHTML='<div class="chart">'+s+'</div><div class="chart-legend wrap v2legwrap">'+legend+'</div>';
+  var byKey={}; top.forEach(function(g){ byKey[g.key]=g; });
+  Array.prototype.forEach.call(el(elId).querySelectorAll('.v2leg'),function(sp){ sp.addEventListener('click',function(){ var g=byKey[decodeURIComponent(sp.getAttribute('data-key'))]; if(g) onPick(g); }); });
+}
+function v2Table(elId,title,hint,list,level){
+  if(!el(elId)) return;
+  if(!list.length){ el(elId).innerHTML='<div class="card"><div class="card-h">'+title+'</div><div class="empty">Sem dados no período.</div></div>'; return; }
+  var shown=list.slice(0,80);
+  var medL=median(shown.map(function(o){return o.leads>0?o.spend/o.leads:null;}).filter(function(x){return x!=null;}));
+  var lvlLab=['Campanha','Conjunto / Grupo','Anúncio'][level];
+  var head='<thead><tr><th>'+lvlLab+'</th><th class="num">Gasto</th><th class="num">Impr.</th><th class="num">CPM</th><th class="num">Cliques</th><th class="num">CTR</th><th class="num">CPC</th><th class="num">Leads</th><th class="num">CPL</th><th class="num">Lead A</th><th class="num">Custo Lead A</th><th class="num">% A</th></tr></thead>';
+  var body=shown.map(function(o){ var m=v2Metrics(o), sel=v2SelOf(o,level);
+    var cplCell=m.cpl!=null?'<span class="cpl-pill '+relClass(m.cpl,medL)+'">'+money(m.cpl)+'</span>':'—';
+    return '<tr class="v2row'+(sel?' sel':'')+'" data-key="'+encodeURIComponent(o.key)+'">'
+      +'<td><span class="v2name" title="'+esc(o.name)+'">'+(sel?'● ':'')+esc(o.name)+'</span></td>'
+      +'<td class="num">'+money0(o.spend)+'</td>'
+      +'<td class="num">'+intf(o.impr)+'</td>'
+      +'<td class="num">'+(m.cpm!=null?money0(m.cpm):'—')+'</td>'
+      +'<td class="num">'+intf(o.clicks)+'</td>'
+      +'<td class="num">'+(m.ctr!=null?pct(m.ctr):'—')+'</td>'
+      +'<td class="num">'+(m.cpc!=null?money(m.cpc):'—')+'</td>'
+      +'<td class="num">'+intf(o.leads)+'</td>'
+      +'<td class="num">'+cplCell+'</td>'
+      +'<td class="num"><b class="cA">'+intf(o.la)+'</b></td>'
+      +'<td class="num">'+(m.cpla!=null?money0(m.cpla):'—')+'</td>'
+      +'<td class="num">'+(m.pctA!=null?pct(m.pctA):'—')+'</td></tr>'; }).join('');
+  var more = list.length>shown.length ? ' <span class="hint">· mostrando top '+shown.length+' de '+list.length+' por gasto</span>' : '';
+  el(elId).innerHTML='<div class="card"><div class="card-h">'+title+' <span class="hint">'+hint+'</span>'+more+'</div><div class="table-scroll"><table class="tbl v2tbl">'+head+'<tbody>'+body+'</tbody></table></div></div>';
+  var byKey={}; shown.forEach(function(o){ byKey[o.key]=o; });
+  Array.prototype.forEach.call(el(elId).querySelectorAll('.v2row'),function(tr){ tr.addEventListener('click',function(){ var o=byKey[decodeURIComponent(tr.getAttribute('data-key'))]; if(o) v2Pick(level,o); }); });
+}
+function v2CrumbHTML(){
+  var p=['<a class="v2crumb'+(v2Sel.camp==null?' cur':'')+'" data-lvl="0">📊 Todas as campanhas</a>'];
+  if(v2Sel.camp!=null) p.push('<a class="v2crumb'+(v2Sel.adset==null?' cur':'')+'" data-lvl="1">'+esc(prettyName(v2Sel.camp))+'</a>');
+  if(v2Sel.adset!=null) p.push('<a class="v2crumb'+(v2Sel.ad==null?' cur':'')+'" data-lvl="2">'+esc(prettyName(v2Sel.adset))+'</a>');
+  if(v2Sel.ad!=null) p.push('<span class="v2crumb cur">'+esc(prettyName(v2Sel.ad))+'</span>');
+  return p.join(' <span class="v2sep">›</span> ');
+}
+function mountV2(){
+  if(!el('v2Wrap')) return;
+  var rng=v2RangeFor(v2Period);
+  var base=grain.filter(function(r){ return isDate(r.date)&&inRange(r.date,rng)&&chMatch(r)&&faseMatch(r); });
+  // barra de período + limpar
+  var PW=[{k:'7d',l:'7 dias'},{k:'14d',l:'14 dias'},{k:'30d',l:'30 dias'},{k:'tudo',l:'Tudo'}];
+  var clr=(v2Sel.camp!=null||v2Sel.adset!=null||v2Sel.ad!=null)?'<button class="v2clr" id="v2Clear">✕ limpar filtro</button>':'';
+  el('v2Periods').innerHTML='<span class="pf-h">Período:</span>'+PW.map(function(w){return '<button data-k="'+w.k+'" class="pbtn'+(v2Period===w.k?' on':'')+'">'+w.l+'</button>';}).join('')+clr;
+  Array.prototype.forEach.call(el('v2Periods').querySelectorAll('.pbtn'),function(b){ b.addEventListener('click',function(){ v2Period=b.getAttribute('data-k'); mountV2(); }); });
+  if(el('v2Clear')) el('v2Clear').addEventListener('click',function(){ v2Sel={camp:null,adset:null,ad:null}; mountV2(); });
+  // breadcrumb do filtro
+  el('v2Crumb').innerHTML=v2CrumbHTML();
+  Array.prototype.forEach.call(el('v2Crumb').querySelectorAll('a.v2crumb'),function(a){ a.addEventListener('click',function(){ var lvl=+a.getAttribute('data-lvl');
+    if(lvl===0) v2Sel={camp:null,adset:null,ad:null}; else if(lvl===1) v2Sel={camp:v2Sel.camp,adset:null,ad:null}; else v2Sel={camp:v2Sel.camp,adset:v2Sel.adset,ad:null}; mountV2(); }); });
+  // recorte pela seleção atual (é o "100% filtrável")
+  var scope=base.filter(function(r){ return (v2Sel.camp==null||r.campaign===v2Sel.camp)&&(v2Sel.adset==null||r.adset===v2Sel.adset)&&(v2Sel.ad==null||r.ad===v2Sel.ad); });
+  // KPIs reativos
+  var agg=newNode('',''); scope.forEach(function(r){ accum(agg,r); });
+  el('v2Kpi').innerHTML=v2Kpis(v2Metrics(agg));
+  // gráficos reativos
+  var days=seriesByDate(scope);
+  if(days.length) v2DailyChart(days,'v2Daily'); else el('v2Daily').innerHTML='<div class="empty">Sem dados no período.</div>';
+  var mlLevel = v2Sel.ad!=null?2:(v2Sel.adset!=null?2:(v2Sel.camp!=null?1:0));
+  var mlGroups=v2groupBy(scope, mlLevel);
+  v2Lines(mlGroups,'v2Lines',mlLevel,function(g){ v2Pick(mlLevel,g); });
+  el('v2LinesTitle').textContent = v2Sel.adset!=null?'CPL por dia · por anúncio' : (v2Sel.camp!=null?'CPL por dia · por conjunto' : 'CPL por dia · por campanha');
+  // tabelas (sempre visíveis → trocar de item é só clicar em outro)
+  v2Table('v2TCamp','Campanhas','clique numa linha p/ filtrar tudo · clique de novo p/ limpar', v2groupBy(base,0), 0);
+  var conjRows = v2Sel.camp!=null? base.filter(function(r){return r.campaign===v2Sel.camp;}) : base;
+  v2Table('v2TAdset','Conjuntos / Grupos', v2Sel.camp!=null?'da campanha selecionada':'todos · selecione uma campanha p/ focar', v2groupBy(conjRows,1), 1);
+  var adRows = v2Sel.adset!=null? base.filter(function(r){return r.campaign===v2Sel.camp&&r.adset===v2Sel.adset;}) : (v2Sel.camp!=null? base.filter(function(r){return r.campaign===v2Sel.camp;}) : base);
+  v2Table('v2TAd','Anúncios', v2Sel.adset!=null?'do conjunto selecionado':(v2Sel.camp!=null?'da campanha selecionada':'todos'), v2groupBy(adRows,2), 2);
 }
 
 /* =================== ACOMPANHAMENTO GERAL (saúde da captação · foco Lead A) =================== */
@@ -1092,7 +1258,7 @@ function mountQualidade(){
 function renderAll(){ var rng=rangeFor(period), a=aggDaily(rng), p=aggDaily(prevRange(rng)), days=daysInRange(rng);
   renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderHotCold(hotColdByDate(rng)); renderDaily(rng); renderTree(rng); mountQualidade();
   var hc=el('hotColdCard'); if(hc) hc.style.display=(funKey==='l21')?'':'none'; }
-var TABS=['funil','micro','leads','perfil','acomp','qualidade','aquec','engaje'];
+var TABS=['funil','micro','v2','leads','perfil','acomp','qualidade','aquec','engaje'];
 /* ---- Aquecimento (L21) · dados via MCP do Meta Ads (snapshot em aquecimento.js) ---- */
 function mountAquec(){
   var w=el('aquecWrap'); if(!w) return;
@@ -1165,7 +1331,12 @@ function mountAquec(){
 function syncL21Tabs(){
   var show=(funKey==='l21');
   Array.prototype.forEach.call(document.querySelectorAll('.tab-l21only'),function(b){ b.style.display=show?'':'none'; });
-  if(!show){ var act=document.querySelector('.tab.active'); if(act && act.classList.contains('tab-l21only')){ activateTab('funil'); if(history.replaceState)history.replaceState(null,'','#funil'); } }
+  // aba V2 é só do funil S (s1) — some no L21
+  var showS1=(funKey==='s1');
+  Array.prototype.forEach.call(document.querySelectorAll('.tab-s1only'),function(b){ b.style.display=showS1?'':'none'; });
+  var act=document.querySelector('.tab.active');
+  if(act && ((!show && act.classList.contains('tab-l21only')) || (!showS1 && act.classList.contains('tab-s1only')))){
+    activateTab('funil'); if(history.replaceState)history.replaceState(null,'','#funil'); }
 }
 function activateTab(id){ Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(x){x.classList.toggle('active',x.getAttribute('data-tab')===id);});
   TABS.forEach(function(k){ el('tab-'+k).classList.toggle('hidden',k!==id); }); }
@@ -1204,7 +1375,8 @@ function switchFunnel(key){
   profPeriod='tudo'; profSrc=-1; profMed=-1; profCamp=-1; fase='all'; acompWin=7;
   microPath=[]; microMetric='leads'; microPeriod='tudo';
   qualPeriod='tudo'; engPeriod='tudo'; engCustom=null;
-  initFases(); initPeriods(); initEngPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountAquec(); mountQualidade(); syncL21Tabs();
+  v2Sel={camp:null,adset:null,ad:null}; v2Period='tudo';
+  initFases(); initPeriods(); initEngPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountV2(); mountAquec(); mountQualidade(); syncL21Tabs();
   if(history.replaceState){ history.replaceState(null,'', location.pathname+'?funnel='+key+(location.hash||'')); }
 }
 function initFunnels(){
@@ -1219,5 +1391,5 @@ function initFunnels(){
 }
 
 if(!funnels.length || (!daily.length && !grain.length)){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
-else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initEngPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountAquec(); mountQualidade(); syncL21Tabs(); }
+else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initEngPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountV2(); mountAquec(); mountQualidade(); syncL21Tabs(); }
 })();

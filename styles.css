@@ -423,3 +423,25 @@ tr.mrow{cursor:pointer}
 tr.mrow:hover{background:rgba(139,124,240,.08)}
 .mname .mcaret{color:var(--vi2);font-size:11px;margin-right:2px}
 tr.mrow:hover .mcaret{color:var(--cy2)}
+
+/* ---- Funil S · V2 — otimização 100% filtrável ---- */
+.v2bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.v2crumbwrap{font-size:12px;color:var(--muted2,#8093b3);display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.v2crumb-lab{color:var(--muted2,#8093b3);font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:10px}
+.v2crumb{cursor:pointer;color:var(--cy,#22d3ee);text-decoration:none;padding:2px 6px;border-radius:6px;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom}
+a.v2crumb:hover{background:rgba(34,211,238,.12)}
+.v2crumb.cur{color:var(--ink2,#e6edf7);cursor:default;font-weight:700}
+.v2sep{color:#3a4459}
+.v2clr{margin-left:8px;background:rgba(242,99,126,.14);color:#f2637e;border:1px solid rgba(242,99,126,.4);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:700}
+.v2clr:hover{background:rgba(242,99,126,.24)}
+.v2tbl tbody tr.v2row{cursor:pointer}
+.v2tbl tbody tr.v2row:hover{background:rgba(34,211,238,.07)}
+.v2tbl tbody tr.v2row.sel{background:rgba(34,211,238,.14);box-shadow:inset 3px 0 0 var(--cy,#22d3ee)}
+.v2name{font-weight:600;display:inline-block;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
+.v2row.sel .v2name{color:var(--cy,#22d3ee)}
+.v2legwrap .v2leg{cursor:pointer;padding:2px 7px;border-radius:20px;border:1px solid transparent;transition:.12s}
+.v2legwrap .v2leg:hover{background:rgba(255,255,255,.05)}
+.v2legwrap .v2leg.on{border-color:var(--cy,#22d3ee);background:rgba(34,211,238,.12);font-weight:700}
+/* micro 100% filtrável: linha selecionada */
+tr.mrow.sel{background:rgba(34,211,238,.14);box-shadow:inset 3px 0 0 var(--cy,#22d3ee)}
+tr.mrow.sel .mname{color:var(--cy,#22d3ee);font-weight:700}
