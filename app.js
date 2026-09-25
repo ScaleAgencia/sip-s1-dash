@@ -788,7 +788,8 @@ function applyFase(){
   if(fase==='all'){ engPeriod='tudo'; engCustom=null; }
   else { var fw=faseDateWindow(fase); if(fw){ engPeriod='custom'; engCustom=fw; } else { engPeriod='tudo'; engCustom=null; } }
   syncEngPeriodUI();
-  treeInited=false; syncFaseUI(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountAcomp(); mountMicro(); }
+  v2Sel={camp:null,adset:null,ad:null};  // trocar de turma limpa a seleção da V2 (o filtro de turma já recorta os dados)
+  treeInited=false; syncFaseUI(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountAcomp(); mountMicro(); mountV2(); }
 function initFases(){ var box=el('fasebar'); if(!box) return; var fs=arr(D.fases);
   if(fs.length<2){ box.innerHTML=''; box.style.display='none'; fase='all'; return; }
   box.style.display='';
