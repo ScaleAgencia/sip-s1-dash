@@ -1027,8 +1027,8 @@ function v2Lines(groups,elId,level,onPick){
   var bandW = n>1? pw/(n-1) : pw;
   dates.forEach(function(dt,i){ var x=xf(i)-bandW/2; if(x<pl)x=pl; s+='<rect class="v2hit" data-i="'+i+'" x="'+x.toFixed(1)+'" y="'+pt+'" width="'+bandW.toFixed(1)+'" height="'+ph+'" fill="transparent" pointer-events="all"/>'; });
   s+='</svg>';
-  var legend=top.map(function(g,gi){ var col=V2PAL[gi%V2PAL.length]; var nm=g.name.length>36?g.name.slice(0,34)+'…':g.name;
-    return '<span class="v2leg'+(v2SelOf(g,level)?' on':'')+'" data-key="'+encodeURIComponent(g.key)+'"><span class="dot" style="background:'+col+'"></span>'+esc(nm)+'</span>'; }).join('');
+  var legend=top.map(function(g,gi){ var col=V2PAL[gi%V2PAL.length]; var nm=g.name.length>40?'…'+g.name.slice(-38):g.name;
+    return '<span class="v2leg'+(v2SelOf(g,level)?' on':'')+'" data-key="'+encodeURIComponent(g.key)+'" title="'+esc(g.name)+'"><span class="dot" style="background:'+col+'"></span>'+esc(nm)+'</span>'; }).join('');
   el(elId).innerHTML='<div class="chart">'+s+'</div><div class="chart-legend wrap v2legwrap">'+legend+'</div>';
   var byKey={}; top.forEach(function(g){ byKey[g.key]=g; });
   Array.prototype.forEach.call(el(elId).querySelectorAll('.v2leg'),function(sp){ sp.addEventListener('click',function(){ var g=byKey[decodeURIComponent(sp.getAttribute('data-key'))]; if(g) onPick(g); }); });
@@ -1039,7 +1039,7 @@ function v2Lines(groups,elId,level,onPick){
       items.sort(function(a,b){return a.cpl-b.cpl;});
       var html='<div class="tt-d">'+fmtBR(dt)+'</div>';
       if(!items.length){ html+='<div class="tt-sub">sem leads nesse dia</div>'; }
-      else items.forEach(function(it){ var nm=it.nm.length>28?it.nm.slice(0,26)+'…':it.nm; html+='<div class="tt-r"><span style="color:'+it.col+'">'+esc(nm)+'</span><b>'+money(it.cpl)+'</b></div>'; });
+      else items.forEach(function(it){ var nm=it.nm.length>34?'…'+it.nm.slice(-32):it.nm; html+='<div class="tt-r"><span style="color:'+it.col+'">'+esc(nm)+'</span><b>'+money(it.cpl)+'</b></div>'; });
       tipShow(html,e.clientX,e.clientY); });
     r.addEventListener('mouseleave',tipHide); });
 }
@@ -1107,16 +1107,20 @@ function mountV2(){
   if(days.length) v2DailyChart(days,'v2Daily'); else el('v2Daily').innerHTML='<div class="empty">Sem dados no período.</div>';
   // cada nível: TABELA + gráfico "CPL por dia" LOGO ABAIXO (top 8 por gasto · legenda clicável p/ filtrar · hover mostra o CPL do dia)
   var campG=v2groupBy(base,0);
-  v2Table('v2TCamp','Campanhas','clique numa linha p/ filtrar tudo · clique de novo p/ limpar', campG, 0);
-  v2Lines(campG,'v2LinesCamp',0,function(g){ v2Pick(0,g); });
+  v2Table('v2TCamp','Campanhas','clique numa linha p/ filtrar tudo (tabelas + gráfico) · clique de novo p/ limpar', campG, 0);
+  // gráfico do nível mostra SÓ a linha do item selecionado (senão todas, p/ comparar)
+  var campLg = v2Sel.camp!=null? campG.filter(function(g){return g.camp===v2Sel.camp;}) : campG;
+  v2Lines(campLg,'v2LinesCamp',0,function(g){ v2Pick(0,g); });
   var conjRows = v2Sel.camp!=null? base.filter(function(r){return r.campaign===v2Sel.camp;}) : base;
   var conjG=v2groupBy(conjRows,1);
   v2Table('v2TAdset','Conjuntos / Grupos', v2Sel.camp!=null?'da campanha selecionada':'todos · selecione uma campanha p/ focar', conjG, 1);
-  v2Lines(conjG,'v2LinesAdset',1,function(g){ v2Pick(1,g); });
+  var conjLg = v2Sel.adset!=null? conjG.filter(function(g){return g.camp===v2Sel.camp&&g.adset===v2Sel.adset;}) : conjG;
+  v2Lines(conjLg,'v2LinesAdset',1,function(g){ v2Pick(1,g); });
   var adRows = v2Sel.adset!=null? base.filter(function(r){return r.campaign===v2Sel.camp&&r.adset===v2Sel.adset;}) : (v2Sel.camp!=null? base.filter(function(r){return r.campaign===v2Sel.camp;}) : base);
   var adG=v2groupBy(adRows,2);
   v2Table('v2TAd','Anúncios', v2Sel.adset!=null?'do conjunto selecionado':(v2Sel.camp!=null?'da campanha selecionada':'todos'), adG, 2);
-  v2Lines(adG,'v2LinesAd',2,function(g){ v2Pick(2,g); });
+  var adLg = v2Sel.ad!=null? adG.filter(function(g){return g.camp===v2Sel.camp&&g.adset===v2Sel.adset&&g.ad===v2Sel.ad;}) : adG;
+  v2Lines(adLg,'v2LinesAd',2,function(g){ v2Pick(2,g); });
 }
 
 /* =================== ACOMPANHAMENTO GERAL (saúde da captação · foco Lead A) =================== */
