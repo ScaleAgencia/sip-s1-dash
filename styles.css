@@ -194,7 +194,9 @@ b{font-weight:700}
 .tree .caret.open{transform:rotate(90deg)}
 .tree .parent{cursor:pointer}
 .tree .parent:hover{background:rgba(34,211,238,.07)}
-.tree .name{overflow:hidden;text-overflow:ellipsis;max-width:420px;display:inline-block;vertical-align:bottom}
+.tree .name{white-space:normal;overflow-wrap:anywhere;line-height:1.35;display:block}
+/* coluna de nome (árvore/micro/V2) larga o suficiente p/ ler campanha/conjunto/anúncio inteiros, sem hover */
+.tbl.tree td:first-child, .tbl.v2tbl td:first-child{white-space:normal;min-width:340px;max-width:600px}
 .tree-legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;font-size:11.5px;color:var(--muted)}
 .tree-legend .dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:middle}
 
@@ -421,6 +423,7 @@ b{font-weight:700}
 .mtrend.big{font-size:14px;padding:5px 13px}
 tr.mrow{cursor:pointer}
 tr.mrow:hover{background:rgba(139,124,240,.08)}
+.mname{white-space:normal;overflow-wrap:anywhere;line-height:1.35;display:block}
 .mname .mcaret{color:var(--vi2);font-size:11px;margin-right:2px}
 tr.mrow:hover .mcaret{color:var(--cy2)}
 
@@ -437,7 +440,7 @@ a.v2crumb:hover{background:rgba(34,211,238,.12)}
 .v2tbl tbody tr.v2row{cursor:pointer}
 .v2tbl tbody tr.v2row:hover{background:rgba(34,211,238,.07)}
 .v2tbl tbody tr.v2row.sel{background:rgba(34,211,238,.14);box-shadow:inset 3px 0 0 var(--cy,#22d3ee)}
-.v2name{font-weight:600;display:inline-block;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
+.v2name{font-weight:600;white-space:normal;overflow-wrap:anywhere;line-height:1.35;display:block}
 .v2row.sel .v2name{color:var(--cy,#22d3ee)}
 .v2legwrap .v2leg{cursor:pointer;padding:2px 7px;border-radius:20px;border:1px solid transparent;transition:.12s}
 .v2legwrap .v2leg:hover{background:rgba(255,255,255,.05)}
