@@ -758,14 +758,14 @@ function syncPeriodUI(){
 function initPeriods(){
   el('periods').innerHTML=periodsHTML();
   Array.prototype.forEach.call(el('periods').querySelectorAll('.pbtn'),function(b){
-    b.addEventListener('click',function(){ period=b.getAttribute('data-k'); customRange=null; syncPeriodUI(); renderAll(); });
+    b.addEventListener('click',function(){ period=b.getAttribute('data-k'); customRange=null; syncPeriodUI(); renderAll(); mountV2(); });
   });
   var de=el('dtDe'), ate=el('dtAte');
   function onDate(){
     var s=de.value, e=ate.value; if(!s||!e) return;
     if(s>e){ var t=s; s=e; e=t; }
     if(s<minDate) s=minDate; if(e>maxDate) e=maxDate;
-    customRange=[s,e]; period='custom'; syncPeriodUI(); renderAll();
+    customRange=[s,e]; period='custom'; syncPeriodUI(); renderAll(); mountV2();
   }
   de.addEventListener('change',onDate); ate.addEventListener('change',onDate);
   syncPeriodUI();
@@ -1081,16 +1081,14 @@ function v2CrumbHTML(){
 }
 function mountV2(){
   if(!el('v2Wrap')) return;
-  var rng=v2RangeFor(v2Period);
+  var rng=rangeFor(period);   // usa o FILTRO DE DATA GERAL do topo (a V2 não tem filtro de data próprio)
   var base=grain.filter(function(r){ return isDate(r.date)&&inRange(r.date,rng)&&v2ChMatch(r)&&faseMatch(r); });
-  // barra de período + canal + limpar
-  var PW=[{k:'7d',l:'7 dias'},{k:'14d',l:'14 dias'},{k:'30d',l:'30 dias'},{k:'tudo',l:'Tudo'}];
+  // barra: indicador do período ativo (vem do filtro geral) + seletor de canal + limpar
   var CH=[{k:'geral',l:'Geral'},{k:'meta',l:'Meta'},{k:'google',l:'Google'}];
   var clr=(v2Sel.camp!=null||v2Sel.adset!=null||v2Sel.ad!=null)?'<button class="v2clr" id="v2Clear">✕ limpar filtro</button>':'';
-  el('v2Periods').innerHTML='<span class="pf-h">Período:</span>'+PW.map(function(w){return '<button data-k="'+w.k+'" class="pbtn'+(v2Period===w.k?' on':'')+'">'+w.l+'</button>';}).join('')
+  el('v2Periods').innerHTML='<span class="pf-h">Período:</span> <span class="v2range">'+fmtBR(rng[0])+' → '+fmtBR(rng[1])+' <small>(ajuste no filtro de data lá em cima)</small></span>'
     +'<span class="pf-h pf-ch">Canal:</span>'+CH.map(function(c){return '<button data-ch="'+c.k+'" class="pbtn'+(v2Channel===c.k?' on':'')+'">'+c.l+'</button>';}).join('')
     +clr;
-  Array.prototype.forEach.call(el('v2Periods').querySelectorAll('.pbtn[data-k]'),function(b){ b.addEventListener('click',function(){ v2Period=b.getAttribute('data-k'); mountV2(); }); });
   Array.prototype.forEach.call(el('v2Periods').querySelectorAll('.pbtn[data-ch]'),function(b){ b.addEventListener('click',function(){ v2Channel=b.getAttribute('data-ch'); mountV2(); }); });
   if(el('v2Clear')) el('v2Clear').addEventListener('click',function(){ v2Sel={camp:null,adset:null,ad:null}; mountV2(); });
   // breadcrumb do filtro
