@@ -29,6 +29,11 @@ $FUNNELS = @(
     #  o campo googleGids2 continua suportado no codigo p/ uso futuro, mas fica vazio aqui.)
     leadsId='19vondd8YlTF4f-nhu3guZAocwqrJz0ofEplbAYEbp5s';   leadsGid='1648797035'
     goalSpend=350000; goalDate='2026-09-14' }   # meta de investimento c/ imposto ate 14/09
+  [ordered]@{ key='l22'; label='SIP-L22';
+    queriesId='1C0_WLRrdHDA-QLYc--bQ7D_Zueq-NyVd-idp5uEAQSQ'; metaGid='0'; googleGid='1609119011';
+    leadsId='1xrHSoS1bg5O8VL22AFv1FY2xuWHnpHrsY_R3lzXhJ70';   leadsGid='1446265479'
+    goalSpend=200000; goalDate='2026-11-09'
+    goalSplit=@{ google=0.80; meta=0.20 } }   # meta 200k ate 09/11 · divisao 80% Google / 20% Meta
 )
 $TAX  = 1.1385          # imposto Meta (+13,85%) aplicado no gasto do Meta
 $TAXG = 1.0             # Google Ads NAO tem imposto
@@ -83,6 +88,9 @@ function Read-Csv($path){
     return $rows
   }
 }
+# linhas de DADOS de um CSV ja lido (sem o header). Guarda o caso de so ter header
+# (Count<=1) -> senao `$x[1..0]` vira range reverso @(1,0) e devolve lixo (header+$null).
+function CsvRows($arr){ if($arr.Count -gt 1){ return @($arr[1..($arr.Count-1)]) } else { return @() } }
 function Norm($s){ if($null -eq $s){return ''}; return ($s -replace [char]0x200b,'').Trim() }
 function MoneyBR($s){ $s=Norm $s; if($s -eq ''){return 0.0}; return [double]($s -replace '\.','' -replace ',','.') }
 function ToInt($s){ $s=Norm $s; if($s -eq ''){return 0}; $v=($s -replace '\.','' -replace ',','.'); if($v -notmatch '^-?\d'){return 0}; return [int][double]$v }
@@ -267,12 +275,12 @@ function Build-Funnel($cfg){
   $qCsv=Join-Path $dataDir 'queries.csv'; $qgCsv=Join-Path $dataDir 'queries_google.csv'
   Get-Sheet $cfg.queriesId $cfg.metaGid   $qCsv
   Get-Sheet $cfg.queriesId $cfg.googleGid $qgCsv
-  $q = Read-Csv $qCsv;  $qh=$q[0];  $qd=$q[1..($q.Count-1)]
-  $qg= Read-Csv $qgCsv; $qgh=$qg[0]; $qgd=@($qg[1..($qg.Count-1)])
+  $q = @(Read-Csv $qCsv);  $qh=$q[0];  $qd=CsvRows $q
+  $qg= @(Read-Csv $qgCsv); $qgh=$qg[0]; $qgd=CsvRows $qg
   # ---- abas Google EXTRAS (mesmas colunas do Google): concatena as linhas ----
   if($cfg.googleGids2){ foreach($xg in $cfg.googleGids2){
     $xCsv=Join-Path $dataDir ("queries_google_"+$xg+".csv"); Get-Sheet $cfg.queriesId $xg $xCsv
-    $xg2=Read-Csv $xCsv
+    $xg2=@(Read-Csv $xCsv)
     if($xg2.Count -gt 1){ $qgd += @($xg2[1..($xg2.Count-1)]); Write-Host ("  +aba Google extra gid "+$xg+": "+($xg2.Count-1)+" linhas") }
   } }
 
@@ -280,7 +288,7 @@ function Build-Funnel($cfg){
   $ld=@(); $lh=@(); $leadsOk=$true
   try {
     $lCsv=Join-Path $dataDir 'leads.csv'; Get-Sheet $cfg.leadsId $cfg.leadsGid $lCsv
-    $l = Read-Csv $lCsv; $lh=$l[0]; $ld=$l[1..($l.Count-1)]
+    $l = @(Read-Csv $lCsv); $lh=$l[0]; $ld=CsvRows $l
   } catch { $leadsOk=$false; Write-Host ("AVISO: planilha de leads inacessivel ("+$_.Exception.Message+")") }
 
   # ---- indices de coluna (META) ----
@@ -378,7 +386,7 @@ function Build-Funnel($cfg){
     $surveyTabs = if($cfg.Contains('surveyTabs') -and $cfg.surveyTabs){ @($cfg.surveyTabs) } else { @('pesquisa') }
     foreach($stab in $surveyTabs){ try {
       $pCsv=Join-Path $dataDir ($stab + '.csv'); Get-SheetByName $cfg.leadsId $stab $pCsv
-      $pp=Read-Csv $pCsv; $ph=$pp[0]; $pdRows=$pp[1..($pp.Count-1)]
+      $pp=@(Read-Csv $pCsv); $ph=$pp[0]; $pdRows=CsvRows $pp
       $P_MAIL=HdrLike $ph '*mail*'; $P_STATUS=HdrLike $ph 'status'; $P_DATE=HdrLike $ph 'date'
       $P_IDADE=HdrLike $ph '*idade*'; $P_MOM=HdrLike $ph '*momento profissional*'; $P_INVEST=HdrLike $ph '*ja investiu*'
       $P_RENDA=HdrLike $ph '*faixa de renda*'; $P_DISPON=HdrLike $ph '*disponivel para investir*'; $P_CURSO=HdrLike $ph '*comprou algum curso*'
@@ -461,7 +469,7 @@ function Build-Funnel($cfg){
   $grpIn=0; $grpOut=0; $grpInByDay=@{}; $grpOutByDay=@{}
   if($leadsOk){ try {
     $gCsv=Join-Path $dataDir 'grupos.csv'; Get-SheetByName $cfg.leadsId 'grupos' $gCsv
-    $gg=Read-Csv $gCsv; $gh=$gg[0]; $gdRows=$gg[1..($gg.Count-1)]
+    $gg=@(Read-Csv $gCsv); $gh=$gg[0]; $gdRows=CsvRows $gg
     $G_DATA=HdrLike $gh 'data'; $G_IN=HdrLike $gh 'entrou'; $G_OUT=HdrLike $gh 'saiu'
     foreach($r in $gdRows){
       if($null -eq $r -or $r.Count -le $G_DATA){ continue }
@@ -557,6 +565,7 @@ function Build-Funnel($cfg){
     key=$cfg.key; label=$cfg.label; funnel=$cfg.label; leadsOk=$leadsOk
     taxMultiplier=$TAX; taxGoogle=$TAXG
     goal=[pscustomobject]@{ spend=[double]$cfg.goalSpend; date=[string]$cfg.goalDate }
+    goalSplit=$(if($cfg.Contains('goalSplit') -and $cfg.goalSplit){ [pscustomobject]$cfg.goalSplit }else{ $null })
     faseGoals=$(if($cfg.Contains('faseGoals') -and $cfg.faseGoals){ [pscustomobject]$cfg.faseGoals }else{ [pscustomobject]@{} })
     dateMin=$(if($dates.Count){$dates[0]}else{''}); dateMax=$(if($dates.Count){$dates[-1]}else{''})
     leadDateMin=$(if($leadDates.Count){$leadDates[0]}else{''}); leadDateMax=$(if($leadDates.Count){$leadDates[-1]}else{''})

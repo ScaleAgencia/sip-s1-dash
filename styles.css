@@ -446,6 +446,23 @@ a.v2crumb:hover{background:rgba(34,211,238,.12)}
 .v2legwrap .v2leg:hover{background:rgba(255,255,255,.05)}
 .v2legwrap .v2leg.on{border-color:var(--cy,#22d3ee);background:rgba(34,211,238,.12);font-weight:700}
 .pf-ch{margin-left:16px}
+/* ---- card de divisão de verba por canal (goalSplit, ex. L22 80/20) ---- */
+.splitcard .split-verdict{display:flex;align-items:center;gap:10px;margin:10px 0 16px;padding:11px 14px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line,#1c2740);font-weight:700}
+.splitcard .split-verdict.okdone{background:rgba(52,211,153,.10);border-color:rgba(52,211,153,.42)}
+.splitcard .split-verdict.behind{background:rgba(245,176,65,.10);border-color:rgba(245,176,65,.42)}
+.split-verdict .sv-ico{font-size:20px;line-height:1}
+.split-verdict .sv-t{font-size:14px}
+.split-rows{display:flex;flex-direction:column;gap:18px}
+.splitrow .split-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px;font-size:13px;gap:10px}
+.splitrow .split-name{font-weight:700;display:flex;align-items:center;gap:7px;white-space:nowrap}
+.splitrow .split-val{color:var(--ink2,#e6edf7);text-align:right}
+.split-st{margin-left:6px;font-size:11px;font-weight:700}
+.split-st.g-ok{color:#34d399}.split-st.g-bad{color:#f5b041}.split-st.muted3{color:#586a8c}
+.split-bar{position:relative;height:15px;border-radius:8px;background:rgba(255,255,255,.06)}
+.split-fill{position:absolute;left:0;top:0;bottom:0;border-radius:8px;opacity:.85}
+.split-tgt{position:absolute;top:-4px;bottom:-4px;width:2px;background:#eaf0fb;box-shadow:0 0 0 1px rgba(0,0,0,.45);border-radius:2px}
+.split-foot{margin-top:6px;font-size:11px;color:var(--muted2,#8093b3)}
+.split-note{margin-top:16px;padding-top:11px;border-top:1px solid var(--line,#1c2740);font-size:12.5px;color:var(--ink2,#e6edf7)}
 .v2range{color:var(--ink2,#e6edf7);font-size:12px;font-weight:600;margin-right:2px}
 .v2range small{color:var(--muted2,#8093b3);font-weight:400}
 /* micro 100% filtrável: linha selecionada */

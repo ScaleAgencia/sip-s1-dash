@@ -477,6 +477,7 @@ function renderAdRank(){
 
 /* =================== PESQUISA & GRUPOS =================== */
 function renderRateChart(elId, rows, getBar, getRate, barColor, barName){
+  rows=arr(rows); if(!rows.length){ if(el(elId)) el(elId).innerHTML='<div class="empty">Sem dados no período.</div>'; return; }
   var W=600,H=210,pl=32,pr=46,pt=12,pb=22,pw=W-pl-pr,ph=H-pt-pb,base=pt+ph;
   var maxB=Math.max.apply(null,rows.map(getBar).concat([1]));
   var maxR=Math.max.apply(null,rows.map(getRate).concat([0.01]));
@@ -726,6 +727,36 @@ function goalCard(goal, deadline, spent, byDate, titleExtra, spendNote){ spendNo
     +'</div>'
     +'<div class="goal-note">'+paceNote+'</div></div>';
 }
+/* ---- card de DIVISÃO DE VERBA por canal (ex.: L22 = 80% Google / 20% Meta) ---- */
+function splitRow(name,color,spend,share,tgt,goalAmt){
+  var rem=Math.max(0,goalAmt-spend), pctActual=share*100, pctTgt=tgt*100;
+  var st = spend<=0 ? {t:'sem gasto',c:'muted3'} : (Math.abs(share-tgt)<=0.05?{t:'no alvo ✓',c:'g-ok'}:(share<tgt?{t:'abaixo',c:'g-bad'}:{t:'acima',c:'g-bad'}));
+  return '<div class="splitrow">'
+    +'<div class="split-top"><span class="split-name"><span class="dot" style="background:'+color+'"></span>'+name+'</span>'
+      +'<span class="split-val"><b>'+money0(spend)+'</b> · '+pct(pctActual)+' <small class="split-st '+st.c+'">'+st.t+'</small></span></div>'
+    +'<div class="split-bar"><span class="split-fill" style="width:'+Math.min(100,Math.max(0,pctActual)).toFixed(1)+'%;background:'+color+'"></span>'
+      +'<span class="split-tgt" style="left:'+Math.min(100,pctTgt).toFixed(1)+'%" title="alvo '+pct(pctTgt)+'"></span></div>'
+    +'<div class="split-foot">alvo <b>'+pct(pctTgt)+'</b> ('+money0(goalAmt)+')'+(rem>0?' · faltam <b>'+money0(rem)+'</b>':' · <b class="g-ok">✓ atingido</b>')+'</div>'
+    +'</div>';
+}
+function goalSplitCard(split,goal){
+  var bc=arr(D.byChannel), m=null,g=null; bc.forEach(function(x){ if(x.ch==='meta')m=x; if(x.ch==='google')g=x; });
+  var gSpend=(g&&g.spend)||0, mSpend=(m&&m.spend)||0, tot=gSpend+mSpend;
+  var gTgt=+split.google||0, mTgt=+split.meta||0;
+  var gShare=dv(gSpend,tot), mShare=dv(mSpend,tot), onTarget=tot>0&&Math.abs(gShare-gTgt)<=0.05;
+  var today=maxDate, gT=0,mT=0; daily.forEach(function(d){ if(d.date===today&&isDate(d.date)){ if(d.channel==='google')gT+=d.spend||0; else if(d.channel==='meta')mT+=d.spend||0; } });
+  var tTot=gT+mT, gTShare=dv(gT,tTot), todayOk=tTot>0&&Math.abs(gTShare-gTgt)<=0.05;
+  var verdict = tot<=0 ? {t:'Ainda sem gasto registrado',c:'',ico:'⏳'}
+    : onTarget ? {t:'Dentro da divisão planejada',c:'okdone',ico:'✅'}
+    : {t:'Fora do alvo — Google '+(gShare<gTgt?'abaixo':'acima')+' ('+pct(gShare*100)+' vs '+pct(gTgt*100)+' da meta)',c:'behind',ico:'⚠️'};
+  var todayTxt = tTot<=0 ? '<span class="muted2">sem gasto hoje</span>' : ('Google <b style="color:'+COL.vi+'">'+pct(gTShare*100)+'</b> · Meta <b style="color:'+COL.cy+'">'+pct((1-gTShare)*100)+'</b> '+(todayOk?'<b class="g-ok">no alvo ✓</b>':'<b class="g-bad">fora do alvo</b>'));
+  return '<div class="card goalcard splitcard">'
+    +'<div class="card-h">🎯 Divisão da verba por canal <span class="hint">meta <b style="color:'+COL.vi+'">80% Google</b> · <b style="color:'+COL.cy+'">20% Meta</b> · % do gasto (Meta c/ imposto)</span></div>'
+    +'<div class="split-verdict '+verdict.c+'"><span class="sv-ico">'+verdict.ico+'</span><span class="sv-t">'+verdict.t+'</span></div>'
+    +'<div class="split-rows">'+splitRow('Google',COL.vi,gSpend,gShare,gTgt,goal*gTgt)+splitRow('Meta',COL.cy,mSpend,mShare,mTgt,goal*mTgt)+'</div>'
+    +'<div class="split-note"><b>Acompanhamento diário</b> — no último dia ('+fmtBR(today)+'): '+todayTxt+'</div>'
+    +'</div>';
+}
 function mountGoal(){
   var box=el('goalWrap'); if(!box) return;
   var html='';
@@ -735,6 +766,8 @@ function mountGoal(){
     var bd={}; daily.forEach(function(d){ if(!isDate(d.date))return; bd[d.date]=(bd[d.date]||0)+(d.spend||0); });
     html+=goalCard(goal, deadline, totals.spend||0, bd, '');
   }
+  // divisão de verba por canal (ex.: L22 80/20)
+  if(D.goalSplit && goal>0){ html+=goalSplitCard(D.goalSplit, goal); }
   // metas por FASE (ex.: S3 do S1) — sempre visíveis, cada uma com o gasto da sua turma
   var FG=D.faseGoals||{};
   Object.keys(FG).forEach(function(fk){ var g=FG[fk]||{}, gs=+g.spend||0, gd=g.date||''; if(!(gs>0)||!gd) return;
@@ -1263,7 +1296,7 @@ function mountQualidade(){
   var col=qualColor(d.overall), lab=d.overall>=75?'SAUDÁVEL':(d.overall>=50?'ATENÇÃO':'CRÍTICO');
   var hero='<div class="qual-hero">'+donut(d.overall/100,col,Math.round(d.overall)+'%','qualidade',176)
     +'<div class="qual-hero-txt"><div class="qual-badge" style="background:'+col+'">'+lab+'</div>'
-    +'<div class="qual-sub">Nota de <b>0 a 100</b> da captação do L21 — <b>média (peso igual, 1/3 cada)</b> de <b class="qA">Leadscoring A</b>, <b class="qQ">público quente</b> e <b class="qG">investimento no Google</b> (onde a conversão é maior).</div></div></div>';
+    +'<div class="qual-sub">Nota de <b>0 a 100</b> da captação do '+esc(funLabel(funKey).replace(/^SIP-/,''))+' — <b>média (peso igual, 1/3 cada)</b> de <b class="qA">Leadscoring A</b>, <b class="qQ">público quente</b> e <b class="qG">investimento no Google</b> (onde a conversão é maior).</div></div></div>';
   var cards='<div class="qd-grid">'
     + qualDim(QUALCFG.a, nf1.format(d.pctA)+'% Lead A <small>(entre respondentes) · meta '+QUALCFG.a.tgt+'%</small>', d.sa, 'Quanto mais leads viram Lead A (perfil comprador), melhor.')
     + qualDim(QUALCFG.q, nf1.format(d.pctQ)+'% dos leads pagos <small>· meta '+QUALCFG.q.tgt+'%</small>', d.sq, 'Fatia de leads vinda de campanhas quentes / remarketing.')
@@ -1282,7 +1315,7 @@ function mountQualidade(){
 }
 function renderAll(){ var rng=rangeFor(period), a=aggDaily(rng), p=aggDaily(prevRange(rng)), days=daysInRange(rng);
   renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderHotCold(hotColdByDate(rng)); renderDaily(rng); renderTree(rng); mountQualidade();
-  var hc=el('hotColdCard'); if(hc) hc.style.display=(funKey==='l21')?'':'none'; }
+  var hc=el('hotColdCard'); if(hc) hc.style.display=(funKey==='l21'||funKey==='l22')?'':'none'; }
 var TABS=['funil','micro','v2','leads','perfil','acomp','qualidade','aquec','engaje'];
 /* ---- Aquecimento (L21) · dados via MCP do Meta Ads (snapshot em aquecimento.js) ---- */
 function mountAquec(){
@@ -1354,14 +1387,13 @@ function mountAquec(){
     +'</div>';
 }
 function syncL21Tabs(){
-  var show=(funKey==='l21');
-  Array.prototype.forEach.call(document.querySelectorAll('.tab-l21only'),function(b){ b.style.display=show?'':'none'; });
-  // aba V2 é só do funil S (s1) — some no L21
-  var showS1=(funKey==='s1');
-  Array.prototype.forEach.call(document.querySelectorAll('.tab-s1only'),function(b){ b.style.display=showS1?'':'none'; });
+  // abas com data-funnels="a,b" só aparecem nesses funis; sem o atributo = todos os funis
   var act=document.querySelector('.tab.active');
-  if(act && ((!show && act.classList.contains('tab-l21only')) || (!showS1 && act.classList.contains('tab-s1only')))){
-    activateTab('funil'); if(history.replaceState)history.replaceState(null,'','#funil'); }
+  Array.prototype.forEach.call(document.querySelectorAll('.tab[data-funnels]'),function(b){
+    var ok=(b.getAttribute('data-funnels')||'').split(',').indexOf(funKey)>=0;
+    b.style.display=ok?'':'none';
+    if(!ok && b===act){ activateTab('funil'); if(history.replaceState)history.replaceState(null,'','#funil'); }
+  });
 }
 function activateTab(id){ Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(x){x.classList.toggle('active',x.getAttribute('data-tab')===id);});
   TABS.forEach(function(k){ el('tab-'+k).classList.toggle('hidden',k!==id); }); }
