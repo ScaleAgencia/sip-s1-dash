@@ -101,6 +101,11 @@ function HdrLike($hdr,$frag){ for($i=0;$i -lt $hdr.Count;$i++){ if((Deaccent $hd
 function TitleFirst($s){ $s=(Norm $s) -replace '\s+',' '; if($s -eq ''){return ''}; return $s.Substring(0,1).ToUpper()+$s.Substring(1) }
 # nome da landing page (coluna 'page' do lead): tira barra final e vazio -> '(sem pagina)'
 function NormPage($s){ $p=Norm $s; if($p -ne ''){ $p=$p.TrimEnd('/') }; if($p -eq ''){ return '(sem pagina)' }; return $p }
+# pagina real dominante de um mapa de votos {pagina: contagem}; ignora '(sem pagina)'; '' se nao houver pagina real
+function DominantPage($votes){ if($null -eq $votes){ return '' }
+  $best=''; $bc=0
+  foreach($pg in $votes.Keys){ if($pg -eq '(sem pagina)'){ continue }; $c=$votes[$pg]; if($c -gt $bc){ $bc=$c; $best=$pg } }
+  return $best }
 # dd/mm/yyyy (ou dd-mm-yyyy) -> yyyy-mm-dd
 function LeadDate($s){ $s=Norm $s; if($s -match '^(\d{1,2})[-/](\d{1,2})[-/](\d{4})'){ return ('{0}-{1:d2}-{2:d2}' -f $Matches[3],[int]$Matches[2],[int]$Matches[1]) }; return '' }
 # ISO createdAt (2026-08-04T..) -> yyyy-mm-dd  (fallback quando 'date' vazio)
@@ -342,6 +347,7 @@ function Build-Funnel($cfg){
   $srcDay=@{}; $paidDay=@{}; $srcTot=@{}   # diario por rede + pago/org por dia
   $leadUtm=@{}   # email -> {fonte(rede), meio(utm_medium), campanha(utm_campaign)} p/ os filtros da aba Perfil
   $adPageVotes=@{}  # chave canal|camp|adset|ad -> {page: contagem} (pra mapear anuncio->landing page via leads)
+  $adsetPageVotes=@{}; $campPageVotes=@{}  # fallback: canal|camp|adset e canal|camp -> {page: contagem}
   if($leadsOk){ foreach($r in $ld){
     if($null -eq $r -or $r.Count -le $L_UCAMP){ continue }
     $mail=Norm $r[$L_MAIL]
@@ -364,6 +370,10 @@ function Build-Funnel($cfg){
       $g=GetGrain $plat $d $cName $sName $aName; $g.leads++; FaseAdd $g $tag 'leads'
       $ak="$plat|$cName|$sName|$aName"; if(-not $adPageVotes.ContainsKey($ak)){ $adPageVotes[$ak]=@{} }
       if(-not $adPageVotes[$ak].ContainsKey($page)){ $adPageVotes[$ak][$page]=0 }; $adPageVotes[$ak][$page]++
+      $sk="$plat|$cName|$sName"; if(-not $adsetPageVotes.ContainsKey($sk)){ $adsetPageVotes[$sk]=@{} }
+      if(-not $adsetPageVotes[$sk].ContainsKey($page)){ $adsetPageVotes[$sk][$page]=0 }; $adsetPageVotes[$sk][$page]++
+      $ck="$plat|$cName"; if(-not $campPageVotes.ContainsKey($ck)){ $campPageVotes[$ck]=@{} }
+      if(-not $campPageVotes[$ck].ContainsKey($page)){ $campPageVotes[$ck][$page]=0 }; $campPageVotes[$ck][$page]++
     } else { $cName=$SENT; $sName=$SENT; $aName=$SENT }
     Bump $dState $stt; Bump $dCity $cty; Bump $dChannel $chan
     # ---- diario: leads por rede (granular) + pago/org por dia ----
@@ -434,14 +444,17 @@ function Build-Funnel($cfg){
   # ---- VISAO DAS PAGINAS: anuncio -> landing page (coluna 'page' dos leads, pagina dominante por anuncio)
   # e agrega o grain (gasto/LPV/leads/LeadA) por data x canal x pagina. Conversao = leads/LPV (Meta)
   # ou leads/cliques (Google) e calculada no front. ----
-  $adPage=@{}; foreach($ak in $adPageVotes.Keys){ $best=''; $bc=-1
-    foreach($pg in $adPageVotes[$ak].Keys){ if($adPageVotes[$ak][$pg] -gt $bc){ $bc=$adPageVotes[$ak][$pg]; $best=$pg } }
-    $adPage[$ak]=$best }
+  # pagina real dominante por nivel; fallback anuncio -> conjunto -> campanha (recupera gasto/LPV de anuncios
+  # sem lead atribuido, desde que a campanha/conjunto tenha leads apontando pra uma LP). So cai em '(sem pagina)'
+  # quando NENHUM nivel tem pagina real (ex.: campanha sem nenhum lead atribuido).
+  $adPage=@{};    foreach($k in $adPageVotes.Keys){    $p=DominantPage $adPageVotes[$k];    if($p -ne ''){ $adPage[$k]=$p } }
+  $adsetPage=@{}; foreach($k in $adsetPageVotes.Keys){ $p=DominantPage $adsetPageVotes[$k]; if($p -ne ''){ $adsetPage[$k]=$p } }
+  $campPage=@{};  foreach($k in $campPageVotes.Keys){  $p=DominantPage $campPageVotes[$k];  if($p -ne ''){ $campPage[$k]=$p } }
   $pagesMap=@{}
   foreach($g in $grain.Values){
     if(-not ($g.spend -gt 0 -or $g.leads -gt 0 -or $g.lpv -gt 0 -or $g.clicks -gt 0)){ continue }
-    $ak="$($g.channel)|$($g.campaign)|$($g.adset)|$($g.ad)"
-    $pg= if($adPage.ContainsKey($ak)){ $adPage[$ak] } else { '(sem pagina)' }
+    $akAd="$($g.channel)|$($g.campaign)|$($g.adset)|$($g.ad)"; $akSet="$($g.channel)|$($g.campaign)|$($g.adset)"; $akCamp="$($g.channel)|$($g.campaign)"
+    $pg= if($adPage.ContainsKey($akAd)){ $adPage[$akAd] } elseif($adsetPage.ContainsKey($akSet)){ $adsetPage[$akSet] } elseif($campPage.ContainsKey($akCamp)){ $campPage[$akCamp] } else { '(sem pagina)' }
     $k="$($g.date)|$($g.channel)|$pg"
     if(-not $pagesMap.ContainsKey($k)){ $pagesMap[$k]=@{date=$g.date;ch=$g.channel;page=$pg;leads=0;lpv=0;spend=0.0;clicks=0;la=0;impr=0} }
     $x=$pagesMap[$k]; $x.leads+=[int]$g.leads; $x.lpv+=[int]$g.lpv; $x.spend+=[double]$g.spend; $x.clicks+=[int]$g.clicks; $x.la+=[int]$g.la; $x.impr+=[int]$g.impr }

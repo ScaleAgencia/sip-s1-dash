@@ -478,3 +478,8 @@ tr.mrow.sel .mname{color:var(--cy,#22d3ee);font-weight:700}
 #pagesTbl .tbl.v2tbl td:first-child{min-width:230px;max-width:420px}
 .pg-name{display:inline-flex;align-items:center;gap:3px;font-weight:600;color:var(--ink2,#e6edf7);word-break:break-all}
 .pg-medal{font-size:15px;line-height:1}
+.pg-baserow td{opacity:.62}
+.pg-name.pg-base{font-style:italic;color:var(--muted)}
+.pg-basetag{font-style:normal;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted2);background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:5px}
+.pg-note{margin-top:12px;padding:10px 13px;background:rgba(245,176,65,.07);border:1px solid rgba(245,176,65,.25);border-radius:9px;font-size:12px;color:var(--ink2,#e6edf7);line-height:1.5}
+.pg-note b{color:var(--ink)}

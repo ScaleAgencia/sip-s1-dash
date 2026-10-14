@@ -1158,7 +1158,8 @@ function mountV2(){
 var pagesChannel='meta';
 function pgConv(p){ return p.lpv>0 ? dv(p.leads,p.lpv)*100 : (p.clicks>0?dv(p.leads,p.clicks)*100:null); }
 function pgMedal(i){ return i===0?'🥇':(i===1?'🥈':(i===2?'🥉':'')); }
-function pgName(pg){ if(pg==='(sem pagina)') return 'Base (sem página)'; return String(pg).replace(/^\//,''); }
+function pgIsBase(pg){ return pg==='(sem pagina)'; }
+function pgName(pg){ if(pgIsBase(pg)) return 'Base · sem página'; return String(pg).replace(/^\//,''); }
 function pagesDailyChart(pages){
   if(!el('pagesChart')) return;
   pages.forEach(function(p){ var m={}; p.rows.forEach(function(r){ var o=m[r.date]||(m[r.date]={leads:0,lpv:0,clicks:0}); o.leads+=+r.leads||0;o.lpv+=+r.lpv||0;o.clicks+=+r.clicks||0; }); p.dmap=m; });
@@ -1216,9 +1217,11 @@ function mountPages(){
     +'<div class="stat"><div class="s-v">'+(T.leads>0?money(dv(T.spend,T.leads)):'—')+'</div><div class="s-l">CPL médio</div></div></div>';
   var medCpl=median(list.map(function(p){return p.leads>0?p.spend/p.leads:null;}).filter(function(x){return x!=null;}));
   var head='<thead><tr><th>Página</th><th class="num">Conversão</th><th class="num">Leads</th><th class="num">'+(pagesChannel==='google'?'Cliques':'LPV')+'</th><th class="num">Gasto</th><th class="num">CPL</th><th class="num">Lead A</th><th class="num">Custo Lead A</th></tr></thead>';
-  var body=list.map(function(p,i){ var cv=pgConv(p), cpl=p.leads>0?dv(p.spend,p.leads):null, cpla=p.la>0?dv(p.spend,p.la):null, med=pgMedal(i), denom=pagesChannel==='google'?p.clicks:p.lpv;
-    return '<tr>'
-      +'<td><span class="pg-name">'+(med?'<span class="pg-medal">'+med+'</span> ':'')+esc(pgName(p.page))+'</span></td>'
+  var realIdx=0;
+  var body=list.map(function(p,i){ var base=pgIsBase(p.page), cv=pgConv(p), cpl=p.leads>0?dv(p.spend,p.leads):null, cpla=p.la>0?dv(p.spend,p.la):null, med=base?'':pgMedal(realIdx), denom=pagesChannel==='google'?p.clicks:p.lpv;
+    if(!base) realIdx++;
+    return '<tr'+(base?' class="pg-baserow"':'')+'>'
+      +'<td><span class="pg-name'+(base?' pg-base':'')+'">'+(med?'<span class="pg-medal">'+med+'</span> ':'')+esc(pgName(p.page))+(base?' <span class="pg-basetag">atribuição</span>':'')+'</span></td>'
       +'<td class="num"><b>'+(cv!=null?pct(cv):'—')+'</b></td>'
       +'<td class="num">'+intf(p.leads)+'</td>'
       +'<td class="num">'+intf(denom)+'</td>'
@@ -1226,7 +1229,11 @@ function mountPages(){
       +'<td class="num">'+(cpl!=null?'<span class="cpl-pill '+relClass(cpl,medCpl)+'">'+money(cpl)+'</span>':'—')+'</td>'
       +'<td class="num"><b class="cA">'+intf(p.la)+'</b></td>'
       +'<td class="num">'+(cpla!=null?money0(cpla):'—')+'</td></tr>'; }).join('');
-  el('pagesTbl').innerHTML='<div class="card"><div class="card-h">Ranking de páginas <span class="hint">ordenado por conversão (lead ÷ '+cvLab+') · 🥇🥈🥉 top 3 · CPL colorido vs mediana</span></div><div class="table-scroll"><table class="tbl v2tbl">'+head+'<tbody>'+body+'</tbody></table></div></div>';
+  var baseP=null; list.forEach(function(p){ if(pgIsBase(p.page)) baseP=p; });
+  var note='';
+  if(baseP){ var bsh=T.spend>0?Math.round(baseP.spend/T.spend*100):0;
+    note='<div class="pg-note">⚠️ <b>Base · sem página</b> = '+money0(baseP.spend)+' ('+bsh+'% do gasto) e '+intf(pagesChannel==='google'?baseP.clicks:baseP.lpv)+' '+(pagesChannel==='google'?'cliques':'LPV')+' em campanhas <b>sem nenhum lead atribuído</b> na planilha — não dá pra amarrar numa landing page. O gasto de anúncios sem lead cujo <i>conjunto/campanha</i> tem leads já é realocado pra página correta.</div>'; }
+  el('pagesTbl').innerHTML='<div class="card"><div class="card-h">Ranking de páginas <span class="hint">ordenado por conversão (lead ÷ '+cvLab+') · 🥇🥈🥉 top 3 páginas · CPL colorido vs mediana</span></div><div class="table-scroll"><table class="tbl v2tbl">'+head+'<tbody>'+body+'</tbody></table></div>'+note+'</div>';
   pagesDailyChart(list.filter(function(p){return pgConv(p)>0;}).slice(0,6));
 }
 
