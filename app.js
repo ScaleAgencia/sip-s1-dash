@@ -791,14 +791,14 @@ function syncPeriodUI(){
 function initPeriods(){
   el('periods').innerHTML=periodsHTML();
   Array.prototype.forEach.call(el('periods').querySelectorAll('.pbtn'),function(b){
-    b.addEventListener('click',function(){ period=b.getAttribute('data-k'); customRange=null; syncPeriodUI(); renderAll(); mountV2(); });
+    b.addEventListener('click',function(){ period=b.getAttribute('data-k'); customRange=null; syncPeriodUI(); renderAll(); mountV2(); mountPages(); });
   });
   var de=el('dtDe'), ate=el('dtAte');
   function onDate(){
     var s=de.value, e=ate.value; if(!s||!e) return;
     if(s>e){ var t=s; s=e; e=t; }
     if(s<minDate) s=minDate; if(e>maxDate) e=maxDate;
-    customRange=[s,e]; period='custom'; syncPeriodUI(); renderAll(); mountV2();
+    customRange=[s,e]; period='custom'; syncPeriodUI(); renderAll(); mountV2(); mountPages();
   }
   de.addEventListener('change',onDate); ate.addEventListener('change',onDate);
   syncPeriodUI();
@@ -1154,6 +1154,82 @@ function mountV2(){
   v2Lines(adLg,'v2LinesAd',2,function(g){ v2Pick(2,g); });
 }
 
+/* =================== VISÃO DAS PÁGINAS (conversão LP→lead por landing page) =================== */
+var pagesChannel='meta';
+function pgConv(p){ return p.lpv>0 ? dv(p.leads,p.lpv)*100 : (p.clicks>0?dv(p.leads,p.clicks)*100:null); }
+function pgMedal(i){ return i===0?'🥇':(i===1?'🥈':(i===2?'🥉':'')); }
+function pgName(pg){ if(pg==='(sem pagina)') return 'Base (sem página)'; return String(pg).replace(/^\//,''); }
+function pagesDailyChart(pages){
+  if(!el('pagesChart')) return;
+  pages.forEach(function(p){ var m={}; p.rows.forEach(function(r){ var o=m[r.date]||(m[r.date]={leads:0,lpv:0,clicks:0}); o.leads+=+r.leads||0;o.lpv+=+r.lpv||0;o.clicks+=+r.clicks||0; }); p.dmap=m; });
+  function convOf(o){ var den=pagesChannel==='google'?o.clicks:o.lpv; return den>0?o.leads/den*100:null; }
+  var dset={}; pages.forEach(function(p){ Object.keys(p.dmap).forEach(function(d){ if(convOf(p.dmap[d])!=null) dset[d]=1; }); });
+  var dates=Object.keys(dset).sort();
+  if(!dates.length){ el('pagesChart').innerHTML='<div class="empty">Sem conversão diária no período.</div>'; return; }
+  var maxC=10; pages.forEach(function(p){ dates.forEach(function(d){ var o=p.dmap[d]; if(o){ var c=convOf(o); if(c!=null&&c>maxC)maxC=c; } }); });
+  var W=820,H=240,pl=44,pr=14,pt=14,pb=26,pw=W-pl-pr,ph=H-pt-pb,base=pt+ph;
+  var n=dates.length; function xf(i){ return pl+(n>1?pw/(n-1)*i:pw/2); } function yf(c){ return base-ph*Math.max(0,Math.min(1,c/maxC)); }
+  var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
+  [0,0.5,1].forEach(function(f){ var y=pt+ph*(1-f); s+='<line x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'" stroke="#182034" stroke-dasharray="2 3"/>'; s+='<text x="'+(pl-4)+'" y="'+(y+3)+'" text-anchor="end" fill="#586a8c" font-size="9">'+Math.round(maxC*f)+'%</text>'; });
+  pages.forEach(function(p,gi){ var col=V2PAL[gi%V2PAL.length], pts=[];
+    dates.forEach(function(dt,i){ var o=p.dmap[dt], c=o?convOf(o):null; if(c!=null) pts.push([xf(i),yf(c)]); });
+    if(pts.length>1) s+='<path d="M'+pts.map(function(q){return q[0].toFixed(1)+' '+q[1].toFixed(1);}).join(' L')+'" fill="none" stroke="'+col+'" stroke-width="2" opacity=".92"/>';
+    pts.forEach(function(q){ s+='<circle cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="2.1" fill="'+col+'"/>'; });
+  });
+  xticks(dates.map(function(d){return {date:d};})).forEach(function(i){ s+='<text x="'+xf(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" fill="#586a8c" font-size="9">'+fmtBR(dates[i])+'</text>'; });
+  var bandW=n>1?pw/(n-1):pw;
+  dates.forEach(function(dt,i){ var x=xf(i)-bandW/2; if(x<pl)x=pl; s+='<rect class="v2hit" data-i="'+i+'" x="'+x.toFixed(1)+'" y="'+pt+'" width="'+bandW.toFixed(1)+'" height="'+ph+'" fill="transparent" pointer-events="all"/>'; });
+  s+='</svg>';
+  var legend=pages.map(function(p,gi){ var col=V2PAL[gi%V2PAL.length]; return '<span class="v2leg"><span class="dot" style="background:'+col+'"></span>'+esc(pgName(p.page))+'</span>'; }).join('');
+  el('pagesChart').innerHTML='<div class="chart">'+s+'</div><div class="chart-legend wrap v2legwrap">'+legend+'</div>';
+  Array.prototype.forEach.call(el('pagesChart').querySelectorAll('.v2hit'),function(rc){
+    rc.addEventListener('mousemove',function(e){ var i=+rc.getAttribute('data-i'), dt=dates[i];
+      var items=[]; pages.forEach(function(p,gi){ var o=p.dmap[dt]; if(o){ var c=convOf(o); if(c!=null) items.push({nm:pgName(p.page),c:c,leads:o.leads,col:V2PAL[gi%V2PAL.length]}); } });
+      items.sort(function(a,b){return b.c-a.c;});
+      var html='<div class="tt-d">'+fmtBR(dt)+'</div>';
+      if(!items.length){ html+='<div class="tt-sub">sem conversão</div>'; }
+      else items.forEach(function(it){ html+='<div class="tt-r"><span style="color:'+it.col+'">'+esc(it.nm.length>22?it.nm.slice(0,20)+'…':it.nm)+'</span><b>'+pct(it.c)+' <small>('+intf(it.leads)+' leads)</small></b></div>'; });
+      tipShow(html,e.clientX,e.clientY); });
+    rc.addEventListener('mouseleave',tipHide); });
+}
+function mountPages(){
+  if(!el('pagesWrap')) return;
+  var rng=rangeFor(period);
+  var all=arr(D.pagesRows).filter(function(r){ return isDate(r.date)&&inRange(r.date,rng)&&(pagesChannel==='geral'||r.ch===pagesChannel); });
+  var CH=[{k:'meta',l:'Meta'},{k:'google',l:'Google'},{k:'geral',l:'Geral'}];
+  el('pagesBar').innerHTML='<span class="pf-h">Período:</span> <span class="v2range">'+fmtBR(rng[0])+' → '+fmtBR(rng[1])+' <small>(ajuste no filtro de data lá em cima)</small></span>'
+    +'<span class="pf-h pf-ch">Canal:</span>'+CH.map(function(c){return '<button data-ch="'+c.k+'" class="pbtn'+(pagesChannel===c.k?' on':'')+'">'+c.l+'</button>';}).join('');
+  Array.prototype.forEach.call(el('pagesBar').querySelectorAll('.pbtn[data-ch]'),function(b){ b.addEventListener('click',function(){ pagesChannel=b.getAttribute('data-ch'); mountPages(); }); });
+  var pm={}; all.forEach(function(r){ var p=pm[r.page]||(pm[r.page]={page:r.page,leads:0,lpv:0,spend:0,clicks:0,la:0,impr:0,rows:[]});
+    p.leads+=+r.leads||0;p.lpv+=+r.lpv||0;p.spend+=+r.spend||0;p.clicks+=+r.clicks||0;p.la+=+r.la||0;p.impr+=+r.impr||0;p.rows.push(r); });
+  var list=Object.keys(pm).map(function(k){return pm[k];});
+  var cvLab = pagesChannel==='google'?'cliques':'LPV';
+  if(!list.length){ el('pagesKpi').innerHTML=''; el('pagesTbl').innerHTML='<div class="card"><div class="empty">Sem dados de página no período'+(pagesChannel!=='meta'?' (canal '+pagesChannel+')':'')+'.</div></div>'; el('pagesChart').innerHTML=''; return; }
+  list.sort(function(a,b){ var ca=pgConv(a),cb=pgConv(b); if(ca==null&&cb==null)return b.leads-a.leads; if(ca==null)return 1; if(cb==null)return -1; return cb-ca || b.leads-a.leads; });
+  var T={leads:0,lpv:0,spend:0,clicks:0,la:0}; list.forEach(function(p){ T.leads+=p.leads;T.lpv+=p.lpv;T.spend+=p.spend;T.clicks+=p.clicks;T.la+=p.la; });
+  var convGeral = T.lpv>0?dv(T.leads,T.lpv)*100:(T.clicks>0?dv(T.leads,T.clicks)*100:null);
+  el('pagesKpi').innerHTML='<div class="stat-row">'
+    +'<div class="stat resp"><div class="s-v">'+(convGeral!=null?pct(convGeral):'—')+'</div><div class="s-l">Conversão geral <small>(lead/'+cvLab+')</small></div></div>'
+    +'<div class="stat"><div class="s-v">'+intf(T.leads)+'</div><div class="s-l">Leads</div></div>'
+    +'<div class="stat"><div class="s-v">'+intf(pagesChannel==='google'?T.clicks:T.lpv)+'</div><div class="s-l">'+(pagesChannel==='google'?'Cliques':'Visitas na LP')+'</div></div>'
+    +'<div class="stat"><div class="s-v">'+money0(T.spend)+'</div><div class="s-l">Gasto</div></div>'
+    +'<div class="stat"><div class="s-v">'+(T.leads>0?money(dv(T.spend,T.leads)):'—')+'</div><div class="s-l">CPL médio</div></div></div>';
+  var medCpl=median(list.map(function(p){return p.leads>0?p.spend/p.leads:null;}).filter(function(x){return x!=null;}));
+  var head='<thead><tr><th>Página</th><th class="num">Conversão</th><th class="num">Leads</th><th class="num">'+(pagesChannel==='google'?'Cliques':'LPV')+'</th><th class="num">Gasto</th><th class="num">CPL</th><th class="num">Lead A</th><th class="num">Custo Lead A</th></tr></thead>';
+  var body=list.map(function(p,i){ var cv=pgConv(p), cpl=p.leads>0?dv(p.spend,p.leads):null, cpla=p.la>0?dv(p.spend,p.la):null, med=pgMedal(i), denom=pagesChannel==='google'?p.clicks:p.lpv;
+    return '<tr>'
+      +'<td><span class="pg-name">'+(med?'<span class="pg-medal">'+med+'</span> ':'')+esc(pgName(p.page))+'</span></td>'
+      +'<td class="num"><b>'+(cv!=null?pct(cv):'—')+'</b></td>'
+      +'<td class="num">'+intf(p.leads)+'</td>'
+      +'<td class="num">'+intf(denom)+'</td>'
+      +'<td class="num">'+money0(p.spend)+'</td>'
+      +'<td class="num">'+(cpl!=null?'<span class="cpl-pill '+relClass(cpl,medCpl)+'">'+money(cpl)+'</span>':'—')+'</td>'
+      +'<td class="num"><b class="cA">'+intf(p.la)+'</b></td>'
+      +'<td class="num">'+(cpla!=null?money0(cpla):'—')+'</td></tr>'; }).join('');
+  el('pagesTbl').innerHTML='<div class="card"><div class="card-h">Ranking de páginas <span class="hint">ordenado por conversão (lead ÷ '+cvLab+') · 🥇🥈🥉 top 3 · CPL colorido vs mediana</span></div><div class="table-scroll"><table class="tbl v2tbl">'+head+'<tbody>'+body+'</tbody></table></div></div>';
+  pagesDailyChart(list.filter(function(p){return pgConv(p)>0;}).slice(0,6));
+}
+
 /* =================== ACOMPANHAMENTO GERAL (saúde da captação · foco Lead A) =================== */
 var acompWin=7;
 function acompAgg(days){ var o={spend:0,leads:0,la:0,lb:0,lc:0,clicks:0,impr:0};
@@ -1316,7 +1392,7 @@ function mountQualidade(){
 function renderAll(){ var rng=rangeFor(period), a=aggDaily(rng), p=aggDaily(prevRange(rng)), days=daysInRange(rng);
   renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderHotCold(hotColdByDate(rng)); renderDaily(rng); renderTree(rng); mountQualidade();
   var hc=el('hotColdCard'); if(hc) hc.style.display=(funKey==='l21'||funKey==='l22')?'':'none'; }
-var TABS=['funil','micro','v2','leads','perfil','acomp','qualidade','aquec','engaje'];
+var TABS=['funil','micro','v2','pages','leads','perfil','acomp','qualidade','aquec','engaje'];
 /* ---- Aquecimento (L21) · dados via MCP do Meta Ads (snapshot em aquecimento.js) ---- */
 function mountAquec(){
   var w=el('aquecWrap'); if(!w) return;
@@ -1433,7 +1509,8 @@ function switchFunnel(key){
   microPath=[]; microMetric='leads'; microPeriod='tudo';
   qualPeriod='tudo'; engPeriod='tudo'; engCustom=null;
   v2Sel={camp:null,adset:null,ad:null}; v2Period='tudo'; v2Channel='geral';
-  initFases(); initPeriods(); initEngPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountV2(); mountAquec(); mountQualidade(); syncL21Tabs();
+  pagesChannel='meta';
+  initFases(); initPeriods(); initEngPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountV2(); mountPages(); mountAquec(); mountQualidade(); syncL21Tabs();
   if(history.replaceState){ history.replaceState(null,'', location.pathname+'?funnel='+key+(location.hash||'')); }
 }
 function initFunnels(){
@@ -1448,5 +1525,5 @@ function initFunnels(){
 }
 
 if(!funnels.length || (!daily.length && !grain.length)){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
-else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initEngPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountV2(); mountAquec(); mountQualidade(); syncL21Tabs(); }
+else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initEngPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountV2(); mountPages(); mountAquec(); mountQualidade(); syncL21Tabs(); }
 })();

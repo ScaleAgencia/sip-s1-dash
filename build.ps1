@@ -99,6 +99,8 @@ function Deaccent($s){ if($null -eq $s){return ''}; $s=$s.Normalize([Text.Normal
   return $sb.ToString().ToLower().Trim() }
 function HdrLike($hdr,$frag){ for($i=0;$i -lt $hdr.Count;$i++){ if((Deaccent $hdr[$i]) -like $frag){ return $i } }; return -1 }
 function TitleFirst($s){ $s=(Norm $s) -replace '\s+',' '; if($s -eq ''){return ''}; return $s.Substring(0,1).ToUpper()+$s.Substring(1) }
+# nome da landing page (coluna 'page' do lead): tira barra final e vazio -> '(sem pagina)'
+function NormPage($s){ $p=Norm $s; if($p -ne ''){ $p=$p.TrimEnd('/') }; if($p -eq ''){ return '(sem pagina)' }; return $p }
 # dd/mm/yyyy (ou dd-mm-yyyy) -> yyyy-mm-dd
 function LeadDate($s){ $s=Norm $s; if($s -match '^(\d{1,2})[-/](\d{1,2})[-/](\d{4})'){ return ('{0}-{1:d2}-{2:d2}' -f $Matches[3],[int]$Matches[2],[int]$Matches[1]) }; return '' }
 # ISO createdAt (2026-08-04T..) -> yyyy-mm-dd  (fallback quando 'date' vazio)
@@ -303,12 +305,12 @@ function Build-Funnel($cfg){
   $G_SPEND=HdrLike $qgh '*cost*'; $G_IMP=HdrLike $qgh 'impressions'; $G_CLK=HdrLike $qgh 'clicks'; $G_CONV=HdrLike $qgh 'conversions'
 
   # ---- indices de coluna (LEADS) ----
-  $L_DATE=-1;$L_CREATED=-1;$L_MAIL=-1;$L_USRC=-1;$L_UMED=-1;$L_UCONT=-1;$L_UTERM=-1;$L_UCAMP=-1;$L_STATE=-1;$L_CITY=-1;$L_TAG=-1
+  $L_DATE=-1;$L_CREATED=-1;$L_MAIL=-1;$L_USRC=-1;$L_UMED=-1;$L_UCONT=-1;$L_UTERM=-1;$L_UCAMP=-1;$L_STATE=-1;$L_CITY=-1;$L_TAG=-1;$L_PAGE=-1
   if($leadsOk){
     $L_DATE=HdrLike $lh 'date'; $L_CREATED=HdrLike $lh 'createdat'; $L_MAIL=HdrLike $lh 'email'
     $L_USRC=HdrLike $lh 'utm_source'; $L_UMED=HdrLike $lh 'utm_medium'; $L_UCONT=HdrLike $lh 'utm_content'
     $L_UTERM=HdrLike $lh 'utm_term'; $L_UCAMP=HdrLike $lh 'utm_campaign'
-    $L_STATE=HdrLike $lh 'state'; $L_CITY=HdrLike $lh 'city'; $L_TAG=HdrLike $lh 'tag'
+    $L_STATE=HdrLike $lh 'state'; $L_CITY=HdrLike $lh 'city'; $L_TAG=HdrLike $lh 'tag'; $L_PAGE=HdrLike $lh 'page'
     if($L_MAIL -lt 0 -or $L_UCAMP -lt 0){ $leadsOk=$false; Write-Host ("AVISO: [$name] leads sem colunas esperadas (email/utm_campaign) -> funil sem leads") }
   }
 
@@ -339,11 +341,13 @@ function Build-Funnel($cfg){
   $dState=@{}; $dCity=@{}; $dChannel=@{}; $leadMails=@{}; $nTest=0
   $srcDay=@{}; $paidDay=@{}; $srcTot=@{}   # diario por rede + pago/org por dia
   $leadUtm=@{}   # email -> {fonte(rede), meio(utm_medium), campanha(utm_campaign)} p/ os filtros da aba Perfil
+  $adPageVotes=@{}  # chave canal|camp|adset|ad -> {page: contagem} (pra mapear anuncio->landing page via leads)
   if($leadsOk){ foreach($r in $ld){
     if($null -eq $r -or $r.Count -le $L_UCAMP){ continue }
     $mail=Norm $r[$L_MAIL]
     $tag = if($L_TAG -ge 0 -and $r.Count -gt $L_TAG){ Norm $r[$L_TAG] } else { '' }
     $src=Norm $r[$L_USRC]; $med=Norm $r[$L_UMED]; $camp=Norm $r[$L_UCAMP]; $cont=Norm $r[$L_UCONT]; $term=Norm $r[$L_UTERM]
+    $page = if($L_PAGE -ge 0 -and $r.Count -gt $L_PAGE){ NormPage $r[$L_PAGE] } else { '(sem pagina)' }
     if($mail -eq ''){ continue }
     if(IsTest $mail $src $med){ $nTest++; continue }
     $d=LeadDate $r[$L_DATE]; if($d -eq '' -and $L_CREATED -ge 0){ $d=IsoDate $r[$L_CREATED] }; if($d -eq ''){ $d='sem-data' }
@@ -358,6 +362,8 @@ function Build-Funnel($cfg){
       $cName=$at.camp; $sName=$at.adset; $aName=$at.ad
       if($d -ne 'sem-data'){ $o=GetDay $plat $d; $o.leads++; FaseAdd $o $tag 'leads' }
       $g=GetGrain $plat $d $cName $sName $aName; $g.leads++; FaseAdd $g $tag 'leads'
+      $ak="$plat|$cName|$sName|$aName"; if(-not $adPageVotes.ContainsKey($ak)){ $adPageVotes[$ak]=@{} }
+      if(-not $adPageVotes[$ak].ContainsKey($page)){ $adPageVotes[$ak][$page]=0 }; $adPageVotes[$ak][$page]++
     } else { $cName=$SENT; $sName=$SENT; $aName=$SENT }
     Bump $dState $stt; Bump $dCity $cty; Bump $dChannel $chan
     # ---- diario: leads por rede (granular) + pago/org por dia ----
@@ -425,6 +431,22 @@ function Build-Funnel($cfg){
       if($o){ $o.$fld++; FaseAdd $o $lr.tag $fld }; $g.$fld++; FaseAdd $g $lr.tag $fld
     }
   }
+  # ---- VISAO DAS PAGINAS: anuncio -> landing page (coluna 'page' dos leads, pagina dominante por anuncio)
+  # e agrega o grain (gasto/LPV/leads/LeadA) por data x canal x pagina. Conversao = leads/LPV (Meta)
+  # ou leads/cliques (Google) e calculada no front. ----
+  $adPage=@{}; foreach($ak in $adPageVotes.Keys){ $best=''; $bc=-1
+    foreach($pg in $adPageVotes[$ak].Keys){ if($adPageVotes[$ak][$pg] -gt $bc){ $bc=$adPageVotes[$ak][$pg]; $best=$pg } }
+    $adPage[$ak]=$best }
+  $pagesMap=@{}
+  foreach($g in $grain.Values){
+    if(-not ($g.spend -gt 0 -or $g.leads -gt 0 -or $g.lpv -gt 0 -or $g.clicks -gt 0)){ continue }
+    $ak="$($g.channel)|$($g.campaign)|$($g.adset)|$($g.ad)"
+    $pg= if($adPage.ContainsKey($ak)){ $adPage[$ak] } else { '(sem pagina)' }
+    $k="$($g.date)|$($g.channel)|$pg"
+    if(-not $pagesMap.ContainsKey($k)){ $pagesMap[$k]=@{date=$g.date;ch=$g.channel;page=$pg;leads=0;lpv=0;spend=0.0;clicks=0;la=0;impr=0} }
+    $x=$pagesMap[$k]; $x.leads+=[int]$g.leads; $x.lpv+=[int]$g.lpv; $x.spend+=[double]$g.spend; $x.clicks+=[int]$g.clicks; $x.la+=[int]$g.la; $x.impr+=[int]$g.impr }
+  $pagesRows=@( $pagesMap.Values | Sort-Object date | ForEach-Object { [pscustomobject]@{ date=$_.date; ch=$_.ch; page=$_.page; leads=$_.leads; lpv=$_.lpv; spend=[math]::Round($_.spend,2); clicks=$_.clicks; la=$_.la; impr=$_.impr } } )
+
   # ---- FASES (tags SIP-S1/SIP-S2/... da planilha de leads) ----
   $faseKeys=@($leadRows | ForEach-Object { if($_.tag -ne ''){$_.tag}else{'(sem tag)'} } | Sort-Object -Unique)
   $faseIdxMap=@{}; for($fi2=0;$fi2 -lt $faseKeys.Count;$fi2++){ $faseIdxMap[$faseKeys[$fi2]]=$fi2 }
@@ -573,6 +595,8 @@ function Build-Funnel($cfg){
     channels=(DistArr $dChannel); geo=(DistArr $dState); cities=(DistArr $dCity)
     fases=@($faseKeys); faseAgg=[pscustomobject]$faseAgg
     srcOrder=@($srcOrder); srcDaily=@($srcDaily); paidDaily=@($paidDaily)
+    pagesRows=@($pagesRows)
+
     engage=[pscustomobject]@{
       leads=$leadRows.Count
       survey=[pscustomobject]@{ total=$survTotal; completed=$survDone; incomplete=$survInc; respondents=$respProfile.Count; respondedLeads=$respLeads; distinctLeads=$leadMails.Count }
