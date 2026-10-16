@@ -19,6 +19,9 @@ $FUNNELS = @(
   [ordered]@{ key='s1';  label='SIP-S1';
     queriesId='1WKRLwQpK4xcoQENOZPk01qROgbTL9vLqTxyp8sfo_9A'; metaGid='0'; googleGid='1609119011';
     leadsId='1nTJYpjYLlK8ZOfA-V9faNSuqz-oegrhccmOgGvrEzm0';   leadsGid='566747937'
+    # so aceita leads com tag da familia do funil (tag vazia passa). Ex.: 15/10 o form do webinario
+    # (/web-iip-v27, tag WBN-2026-SEMANAL-...) gravou 3 leads nesta planilha e virou "turma" fantasma.
+    tagMust='^SIP-S\d+$'
     surveyTabs=@('pesquisa','pesquisa_s4')   # S4 caiu numa aba de pesquisa separada (add 22/09); le e junta as duas
     goalSpend=0; goalDate=''
     # metas de investimento POR FASE (tag do lead) · com impostos · chave = tag exata
@@ -28,10 +31,12 @@ $FUNNELS = @(
     # (Google agora consolida TODAS as campanhas numa aba so, gid 1609119011 -> sem abas extras.
     #  o campo googleGids2 continua suportado no codigo p/ uso futuro, mas fica vazio aqui.)
     leadsId='19vondd8YlTF4f-nhu3guZAocwqrJz0ofEplbAYEbp5s';   leadsGid='1648797035'
+    tagMust='^SIP-L21$'
     goalSpend=350000; goalDate='2026-09-14' }   # meta de investimento c/ imposto ate 14/09
   [ordered]@{ key='l22'; label='SIP-L22';
     queriesId='1C0_WLRrdHDA-QLYc--bQ7D_Zueq-NyVd-idp5uEAQSQ'; metaGid='0'; googleGid='1609119011';
     leadsId='1xrHSoS1bg5O8VL22AFv1FY2xuWHnpHrsY_R3lzXhJ70';   leadsGid='1446265479'
+    tagMust='^SIP-L22$'
     goalSpend=200000; goalDate='2026-11-09'
     goalSplit=@{ google=0.80; meta=0.20 } }   # meta 200k ate 09/11 · divisao 80% Google / 20% Meta
 )
@@ -348,6 +353,7 @@ function Build-Funnel($cfg){
   $leadUtm=@{}   # email -> {fonte(rede), meio(utm_medium), campanha(utm_campaign)} p/ os filtros da aba Perfil
   $adPageVotes=@{}  # chave canal|camp|adset|ad -> {page: contagem} (pra mapear anuncio->landing page via leads)
   $adsetPageVotes=@{}; $campPageVotes=@{}  # fallback: canal|camp|adset e canal|camp -> {page: contagem}
+  $tagMust = if($cfg.Contains('tagMust') -and $cfg.tagMust){ [string]$cfg.tagMust } else { '' }; $nForeign=0
   if($leadsOk){ foreach($r in $ld){
     if($null -eq $r -or $r.Count -le $L_UCAMP){ continue }
     $mail=Norm $r[$L_MAIL]
@@ -356,6 +362,8 @@ function Build-Funnel($cfg){
     $page = if($L_PAGE -ge 0 -and $r.Count -gt $L_PAGE){ NormPage $r[$L_PAGE] } else { '(sem pagina)' }
     if($mail -eq ''){ continue }
     if(IsTest $mail $src $med){ $nTest++; continue }
+    # lead de OUTRO funil gravado nesta planilha (tag fora da familia) -> ignora (nao vira turma nem lead)
+    if($tagMust -ne '' -and $tag -ne '' -and $tag -notmatch $tagMust){ $nForeign++; continue }
     $d=LeadDate $r[$L_DATE]; if($d -eq '' -and $L_CREATED -ge 0){ $d=IsoDate $r[$L_CREATED] }; if($d -eq ''){ $d='sem-data' }
     $paid = IsPaid $src $med
     $chan = Channel $src $camp
@@ -629,6 +637,7 @@ function Build-Funnel($cfg){
   $json = $json.Replace('"__RESP__"', $respJson)
   Write-Host ("  grain={0} leadsReais={1} pago={2} org={3} atrib={4} A/B/C={5}/{6}/{7} de {8}resp testes={9}  gasto=R$ {10}" -f `
     $grainArr.Count,$tot.leads,$tot.paid,$tot.organic,$tot.attributed,$totA,$totB,$totC,$qLeadsResp,$tot.tests,($tot.spend.ToString('N2',$BR)))
+  if($nForeign -gt 0){ Write-Host ("  ignorados {0} leads de OUTRO funil (tag fora de {1})" -f $nForeign,$tagMust) }
   Write-Host ("  META:  gasto=R$ {0}  leads={1} A={2}/B={3}/C={4}  |  GOOGLE: gasto=R$ {5}  leads={6} A={7}/B={8}/C={9}  |  leadsOk={10}" -f `
     ($byChannel[0].spend.ToString('N2',$BR)),$byChannel[0].leads,$byChannel[0].la,$byChannel[0].lb,$byChannel[0].lc,($byChannel[1].spend.ToString('N2',$BR)),$byChannel[1].leads,$byChannel[1].la,$byChannel[1].lb,$byChannel[1].lc,$leadsOk)
   return $json
