@@ -251,6 +251,12 @@ b{font-weight:700}
 .src-n{font-size:14px;font-weight:700;color:var(--ink2);text-align:right;white-space:nowrap}
 .src-n small{color:var(--muted2);font-weight:500;font-size:11.5px;margin-left:4px}
 @media(max-width:620px){.srcrow{grid-template-columns:1fr auto}.srcrow .src-track{display:none}}
+/* detalhe da fonte (utm_term) em chips, abaixo da linha */
+.src-subs{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 2px 19px}
+.src-sub{font-size:11.5px;color:var(--muted);background:var(--panel3);border:1px solid var(--line);border-radius:999px;padding:3px 10px;white-space:nowrap}
+.src-sub b{color:var(--ink2);font-weight:700;margin-left:2px}
+.src-sub small{color:var(--muted2);font-size:10.5px;margin-left:2px}
+.src-sub.none{opacity:.65;font-style:italic}
 
 /* ---------- leadscoring A / B / C ---------- */
 .cA{color:#34d399}.cB{color:#f5b041}.cC{color:#f2637e}

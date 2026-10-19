@@ -135,12 +135,23 @@ function Channel($src,$camp){ $s=Deaccent $src
   if($s -eq ''){ return 'TikTok' }
   if($s -eq 'facebook-ads' -or $s -eq 'fb-ads' -or $s -eq 'facebook' -or $s -eq 'fb'){ return 'Facebook Ads' }
   if($s -like 'google*'){ return 'Google Ads' }
+  # instagram-<perfil> (ex.: instagram-wladir) = Instagram de OUTRO perfil -> fonte propria "Instagram · Wladir"
+  if($s -like 'instagram-?*'){ return 'Instagram '+[char]0xB7+' '+(TitleFirst ($s.Substring(10))) }
   if($s -like 'instagram*' -or $s -eq 'ig'){ return 'Instagram' }
   if($s -eq 'youtube' -or $s -eq 'yt'){ return 'YouTube' }
   if($s -like 'tiktok*'){ return 'TikTok' }
   if($s -eq 'manychat'){ return 'ManyChat' }
   if($s -eq 'whatsapp' -or $s -eq 'wpp'){ return (WaKind $camp) }
   return (TitleFirst $src) }
+# detalhe da fonte p/ o painel "Fontes de leads" (onde dentro da rede: bio/stories/direct, chat da live,
+# grupo...): utm_term, senao utm_content. So p/ fontes NAO pagas (pago tem detalhe nas abas de otimizacao).
+function SrcSub($chan,$term,$cont){
+  if($chan -eq 'Facebook Ads' -or $chan -eq 'Google Ads'){ return '' }
+  $t=([string]$term).Trim().ToLower(); if($t -ne ''){ return $t }
+  $c=([string]$cont).Trim().ToLower(); if($c -ne ''){ return $c }
+  return '(sem detalhe)' }
+function BumpSub($h,$a,$b){ if($null -eq $b -or $b -eq ''){return}; if(-not $h.ContainsKey($a)){ $h[$a]=@{} }; Bump $h[$a] $b }
+function SubArr($h){ $out=@(); foreach($k in $h.Keys){ $out+=[pscustomobject]@{label=[string]$k; subs=(DistArr $h[$k])} }; return ,@($out) }
 # --- utm_campaign p/ o filtro da aba Perfil ---
 # Em query string o caractere '+' vale ESPACO, entao "PUBLICO 40+" e "PUBLICO 40 " sao a
 # MESMA campanha (o '+' foi decodificado como espaco em alguns links). CampKey normaliza p/
@@ -152,6 +163,7 @@ function SourceGran($src,$med,$term,$camp){ $s=Deaccent $src; $t=Deaccent $term
   if($s -eq ''){ return 'TikTok' }
   if($s -eq 'facebook-ads' -or $s -eq 'fb-ads' -or $s -eq 'facebook' -or $s -eq 'fb'){ return 'Facebook Ads' }
   if($s -like 'google*'){ return 'Google Ads' }
+  if($s -like 'instagram-?*'){ return 'Insta '+(TitleFirst ($s.Substring(10))) }
   if($s -like 'instagram*' -or $s -eq 'ig'){ if($t -eq 'bio'){return 'Insta bio'}; if($t -eq 'direct'){return 'Insta direct'}; if($t -ne ''){return 'Insta '+$t}; return 'Instagram' }
   if($s -eq 'youtube' -or $s -eq 'yt'){ return 'YouTube' }
   if($s -like 'tiktok*'){ return 'TikTok' }
@@ -348,7 +360,7 @@ function Build-Funnel($cfg){
 
   # ---- leads: filtra teste, classifica origem e atribui --------------
   $leadRows=New-Object System.Collections.Generic.List[object]
-  $dState=@{}; $dCity=@{}; $dChannel=@{}; $leadMails=@{}; $nTest=0
+  $dState=@{}; $dCity=@{}; $dChannel=@{}; $dChSub=@{}; $leadMails=@{}; $nTest=0
   $srcDay=@{}; $paidDay=@{}; $srcTot=@{}   # diario por rede + pago/org por dia
   $leadUtm=@{}   # email -> {fonte(rede), meio(utm_medium), campanha(utm_campaign)} p/ os filtros da aba Perfil
   $adPageVotes=@{}  # chave canal|camp|adset|ad -> {page: contagem} (pra mapear anuncio->landing page via leads)
@@ -384,6 +396,7 @@ function Build-Funnel($cfg){
       if(-not $campPageVotes[$ck].ContainsKey($page)){ $campPageVotes[$ck][$page]=0 }; $campPageVotes[$ck][$page]++
     } else { $cName=$SENT; $sName=$SENT; $aName=$SENT }
     Bump $dState $stt; Bump $dCity $cty; Bump $dChannel $chan
+    $sub = SrcSub $chan $term $cont; BumpSub $dChSub $chan $sub   # detalhe da fonte (bio/stories/grupo...)
     # ---- diario: leads por rede (granular) + pago/org por dia ----
     if($d -match '^\d{4}-\d{2}-\d{2}$'){
       $rede = SourceGran $src $med $term $camp
@@ -394,7 +407,7 @@ function Build-Funnel($cfg){
       if($paid){ $paidDay[$d].pago++ } else { $paidDay[$d].org++ }
     }
     $em=$mail.ToLower(); if($em -ne ''){ $leadMails[$em]=$true; if(-not $leadUtm.ContainsKey($em)){ $leadUtm[$em]=@{s=$chan; m=(Deaccent $med); c=$camp; t=$tag} } }
-    $leadRows.Add([pscustomobject]@{date=$d;paid=$paid;channel=$chan;plat=$plat;state=$stt;city=$cty;camp=$cName;adset=$sName;ad=$aName;qmail=$em;tag=$tag})
+    $leadRows.Add([pscustomobject]@{date=$d;paid=$paid;channel=$chan;sub=$sub;plat=$plat;state=$stt;city=$cty;camp=$cName;adset=$sName;ad=$aName;qmail=$em;tag=$tag})
   } }
 
   # ===================================================================
@@ -592,15 +605,15 @@ function Build-Funnel($cfg){
     [pscustomobject]@{src='organico';leads=($leadRows.Count-$paidCount)}
   )
   # ---- agregados de leads POR FASE (aba Leads · Visao Geral filtra por fase) — 1 passada ----
-  $faB=@{}; foreach($fk in $faseKeys){ $faB[$fk]=@{ch=@{};st=@{};ct=@{};leads=0;paid=0;attr=0} }
+  $faB=@{}; foreach($fk in $faseKeys){ $faB[$fk]=@{ch=@{};cs=@{};st=@{};ct=@{};leads=0;paid=0;attr=0} }
   foreach($lr in $leadRows){ $fk= if($lr.tag -ne ''){$lr.tag}else{'(sem tag)'}; if(-not $faB.ContainsKey($fk)){ continue }; $b=$faB[$fk]
-    $b.leads++; Bump $b.ch $lr.channel; Bump $b.st $lr.state; Bump $b.ct $lr.city; if($lr.paid){$b.paid++}; if($lr.plat -ne ''){$b.attr++} }
+    $b.leads++; Bump $b.ch $lr.channel; BumpSub $b.cs $lr.channel $lr.sub; Bump $b.st $lr.state; Bump $b.ct $lr.city; if($lr.paid){$b.paid++}; if($lr.plat -ne ''){$b.attr++} }
   $faseAgg=@{}
   foreach($fk in $faseKeys){ $b=$faB[$fk]
     $faseAgg[$fk]=[pscustomobject]@{
       leads=$b.leads; paid=$b.paid; organic=($b.leads-$b.paid); attributed=$b.attr
       states=(@($b.st.Keys|Where-Object{$_ -ne ''}).Count)
-      channels=(DistArr $b.ch); geo=(DistArr $b.st); cities=(DistArr $b.ct)
+      channels=(DistArr $b.ch); chSub=(SubArr $b.cs); geo=(DistArr $b.st); cities=(DistArr $b.ct)
     }
   }
 
@@ -613,7 +626,7 @@ function Build-Funnel($cfg){
     dateMin=$(if($dates.Count){$dates[0]}else{''}); dateMax=$(if($dates.Count){$dates[-1]}else{''})
     leadDateMin=$(if($leadDates.Count){$leadDates[0]}else{''}); leadDateMax=$(if($leadDates.Count){$leadDates[-1]}else{''})
     totals=$tot; byChannel=@($byChannel); bySource=@($bySource)
-    channels=(DistArr $dChannel); geo=(DistArr $dState); cities=(DistArr $dCity)
+    channels=(DistArr $dChannel); channelSub=(SubArr $dChSub); geo=(DistArr $dState); cities=(DistArr $dCity)
     fases=@($faseKeys); faseAgg=[pscustomobject]$faseAgg
     srcOrder=@($srcOrder); srcDaily=@($srcDaily); paidDaily=@($paidDaily)
     pagesRows=@($pagesRows)
