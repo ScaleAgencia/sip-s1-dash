@@ -170,11 +170,14 @@ function bindHits(containerId,days,fmt){ var c=el(containerId); if(!c) return;
   Array.prototype.forEach.call(c.querySelectorAll('.hit'),function(r){
     r.addEventListener('mousemove',function(e){ var i=+r.getAttribute('data-i'); if(days[i]) tipShow(fmt(days[i]),e.clientX,e.clientY); });
     r.addEventListener('mouseleave',tipHide); }); }
+var _leadsReq=null;   // mínimo/dia da meta de leads de tráfego (L22) p/ o gráfico "Leads por dia" (preenchido em renderChartLeads)
 function tipLeads(d){
   var s='<div class="tt-d">'+fmtBR(d.date)+'</div>'
     +'<div class="tt-r"><span style="color:'+COL.cy2+'">Leads</span><b>'+intf(d.leads)+'</b></div>';
   if(channel==='geral'){ s+='<div class="tt-r"><span style="color:'+COL.cy+'">Meta</span><b>'+intf(d.mLeads)+'</b></div>'
     +'<div class="tt-r"><span style="color:'+COL.vi2+'">Google</span><b>'+intf(d.gLeads)+'</b></div>'; }
+  var rq=_leadsReq&&_leadsReq.byDate[d.date];
+  if(rq) s+='<div class="tt-r"><span style="color:#f5b041">Mínimo p/ meta</span><b>'+intf(rq.reqC)+'</b></div>';
   return s+'<div class="tt-sub">Investimento <b>'+money0(d.spend)+'</b> · CPL <b>'+(d.leads?money(dv(d.spend,d.leads)):'—')+'</b></div>'; }
 function tipInvest(d){
   return '<div class="tt-d">'+fmtBR(d.date)+'</div>'
@@ -184,7 +187,8 @@ function tipInvest(d){
 
 function renderChartLeads(days){
   var W=600,H=210,pl=30,pr=10,pt=12,pb=22,pw=W-pl-pr,ph=H-pt-pb,base=pt+ph;
-  var maxL=Math.max.apply(null,days.map(function(d){return d.leads||0;}).concat([1]));
+  _leadsReq = (fase==='all' || arr(D.fases).length<=1) ? lgReqFor(channel) : null;   // meta de leads do tráfego (só funis c/ leadGoal, ex.: L22)
+  var maxL=Math.max.apply(null,days.map(function(d){ var rq=_leadsReq&&_leadsReq.byDate[d.date]; return Math.max(d.leads||0, rq?rq.reqC:0); }).concat([1]));
   var n=days.length||1,gw=pw/n,bw=Math.max(3,Math.min(20,gw*0.5));
   var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
   [0,0.5,1].forEach(function(f){ var y=pt+ph*(1-f); s+='<line x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'" stroke="#182034" stroke-dasharray="2 3"/>'; s+='<text x="'+(pl-4)+'" y="'+(y+3)+'" text-anchor="end" fill="#586a8c" font-size="9">'+Math.round(maxL*f)+'</text>'; });
@@ -196,11 +200,20 @@ function renderChartLeads(days){
       if(d.mLeads>0) s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-hm).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+hm.toFixed(1)+'" rx="1.5" fill="'+COL.cy+'"/>';
       if(d.gLeads>0) s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-hm-hg).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+hg.toFixed(1)+'" rx="1.5" fill="'+COL.vi+'"/>'; }
   });
+  // linha em degrau = mínimo de leads do dia p/ bater a meta de tráfego (só nos dias dentro da meta)
+  var reqLeg='';
+  if(_leadsReq){ var path='', lastPt=null;
+    days.forEach(function(d,i){ var rq=_leadsReq.byDate[d.date]; if(!rq){ lastPt=null; return; }
+      var x0=(pl+gw*i).toFixed(1), x1=(pl+gw*(i+1)).toFixed(1), yy=(base-ph*dv(rq.reqC,maxL)).toFixed(1);
+      path+=(lastPt===null?'M':' L')+x0+' '+yy+' L'+x1+' '+yy; lastPt=yy; });
+    if(path){ s+='<path d="'+path+'" fill="none" stroke="#f5b041" stroke-width="1.8" stroke-dasharray="5 3"/>';
+      var lab=channel==='google'?'Google':channel==='meta'?'Meta':'tráfego';
+      reqLeg='<span><span class="ln" style="background:#f5b041"></span>mínimo/dia p/ meta de '+intf(_leadsReq.goal)+' leads ('+lab+')</span>'; } }
   xticks(days).forEach(function(i){ var xc=pl+gw*i+gw/2; s+='<text x="'+xc.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" fill="#586a8c" font-size="9">'+fmtBR(days[i].date)+'</text>'; });
   s+=hitRects(days,pl,gw,pt,ph)+'</svg>';
   var legend = single ? '<span><span class="dot" style="background:'+sColor+'"></span>Leads</span>'
     : '<span><span class="dot" style="background:'+COL.cy+'"></span>Meta</span><span><span class="dot" style="background:'+COL.vi+'"></span>Google</span>';
-  el('chartLeads').innerHTML='<div class="chart">'+s+'</div><div class="chart-legend">'+legend+'</div>';
+  el('chartLeads').innerHTML='<div class="chart">'+s+'</div><div class="chart-legend">'+legend+reqLeg+'</div>';
   bindHits('chartLeads',days,tipLeads);
 }
 function renderChartInvest(days){
@@ -445,6 +458,7 @@ function mountSourceDaily(){
   else renderStacked('chartPaidDaily', prows, ['Tráfego pago','Orgânico'], function(k){ return k==='Tráfego pago'?COL.cy:COL.vi; });
 }
 function mountLeads(){
+  mountLeadGoals();   // metas de leads (tráfego 39k + segmentos) — só aparece nos funis c/ leadGoal (L22)
   var LA=leadAgg(), total=LA.leads||0, paid=LA.paid||0, org=LA.organic||0, spend=faseSpend();
   var paidFrac=dv(paid,total), citiesN=arr(LA.cities).length;
   var geo=LA.geo, topState=geo[0];
@@ -795,6 +809,184 @@ function mountGoal(){
   });
   box.innerHTML=html;
 }
+
+/* =================== METAS DE LEADS (L22): tráfego 39k c/ 80% Google + metas por SEGMENTO =================== */
+// Trilha diária de uma meta de VOLUME. map = {data: leads do dia}, G = meta, S = início, E = prazo.
+// "mínimo do dia" = (meta − acumulado ANTES do dia) / dias restantes (incl. o dia): se um dia fica abaixo,
+// o mínimo dos dias seguintes sobe sozinho; se fica acima, desce. Hoje = dia em andamento (parcial).
+function lgTrack(map, G, S, E){
+  var tISO=todayISO(), keys=Object.keys(map||{}).filter(isDate).sort();
+  var lastData=keys.length?keys[keys.length-1]:tISO, top=tISO>lastData?tISO:lastData, endIt=top<E?top:E;
+  var cum=0; keys.forEach(function(d){ if(d<S) cum+=+map[d]||0; });           // leads antes do início também contam
+  var rows=[];
+  for(var d=S; d<=endIt; d=addDays(d,1)){
+    var got=+map[d]||0, req=Math.max(0,(G-cum)/(daysBetween(d,E)+1));
+    rows.push({date:d, got:got, req:req, reqC:Math.ceil(req), cumBefore:cum, partial:d===tISO, ok:got>=Math.ceil(req)});
+    cum+=got;
+  }
+  var before=0, achieved=0; keys.forEach(function(d){ if(d>E) return; achieved+=+map[d]||0; if(d<tISO) before+=+map[d]||0; });
+  var totalDays=Math.max(1,daysBetween(S,E)+1), over=tISO>E, daysLeft=over?0:daysBetween(tISO,E)+1;
+  var elapsed=Math.max(0,Math.min(totalDays,daysBetween(S,tISO)));           // dias COMPLETOS desde o início (até ontem)
+  var idealBefore=G*elapsed/totalDays;
+  var full=rows.filter(function(r){ return r.date<tISO; }), last7=full.slice(-7);
+  var pace=last7.length? last7.reduce(function(s,r){return s+r.got;},0)/last7.length : 0;
+  return {G:G,S:S,E:E,rows:rows,achieved:achieved,before:before,today:+(map||{})[tISO]||0,daysLeft:daysLeft,
+    reqToday:over?0:Math.max(0,(G-before)/daysLeft), idealBefore:idealBefore, ahead:before-idealBefore, pace:pace,
+    projected:before+pace*daysLeft, done:achieved>=G, over:over, totalDays:totalDays, elapsed:elapsed,
+    okDays:full.filter(function(r){return r.ok;}).length, nDays:full.length};
+}
+// leads do TRÁFEGO por dia (utm_source Google Ads / Facebook Ads, vindos do diário por rede)
+function lgTrafficMaps(){ var g={},m={},t={};
+  arr(D.srcDaily).forEach(function(r){ if(!isDate(r.date)) return; var v=r.vals||{}, gg=+v['Google Ads']||0, mm=+v['Facebook Ads']||0;
+    g[r.date]=gg; m[r.date]=mm; t[r.date]=gg+mm; });
+  return {google:g,meta:m,total:t}; }
+function lgOn(){ var LG=D.leadGoal; return !!(LG && +LG.total>0 && LG.date); }
+function lgStart(){ return D.leadGoal.start || D.dateMin || D.leadGoal.date; }
+// mínimo/dia da meta de tráfego p/ o gráfico "Leads por dia" do Funil (canal-aware: Geral=total, Google=80%, Meta=20%)
+function lgReqFor(ch){ if(!lgOn()) return null; var LG=D.leadGoal, M=lgTrafficMaps();
+  var share= ch==='google'?(+LG.google||0) : ch==='meta'?(+LG.meta||0) : 1;
+  var map  = ch==='google'?M.google : ch==='meta'?M.meta : M.total;
+  if(!(share>0)) return null;
+  var T=lgTrack(map,(+LG.total)*share,lgStart(),LG.date), out={}; T.rows.forEach(function(r){ out[r.date]=r; });
+  return {byDate:out, T:T, goal:(+LG.total)*share}; }
+function lgStatusChip(T){
+  if(T.done) return '<span class="lg-chip done">✓ meta batida</span>';
+  if(T.over) return '<span class="lg-chip bad">prazo encerrado</span>';
+  return T.ahead>=0 ? '<span class="lg-chip ok">no plano · +'+intf(Math.round(T.ahead))+'</span>'
+                    : '<span class="lg-chip bad">atrás · −'+intf(Math.round(-T.ahead))+'</span>'; }
+function lgBar(T,color,cls){ var p=clamp(T.G>0?T.achieved/T.G:0), ideal=clamp(T.elapsed/T.totalDays);
+  return '<div class="gb-track '+(cls||'')+'"><span class="gb-fill" style="width:'+(p*100).toFixed(1)+'%'+(color?';background:'+color:'')+'"></span>'
+    +(ideal>0&&ideal<1?'<span class="gb-ideal" style="left:'+(ideal*100).toFixed(1)+'%" title="ritmo ideal até ontem: '+intf(Math.round(T.idealBefore))+'"></span>':'')+'</div>'; }
+function lgChRow(name,color,T){ var p=clamp(T.G>0?T.achieved/T.G:0);
+  return '<div class="lg-ch"><div class="lg-ch-top"><span class="lg-ch-name"><span class="dot" style="background:'+color+'"></span>'+name+'</span>'
+    +'<span class="lg-ch-val"><b>'+intf(T.achieved)+'</b> de '+intf(Math.round(T.G))+' <small>'+pct(p*100)+'</small></span></div>'
+    +lgBar(T,color,'sm')
+    +'<div class="lg-ch-foot"><span>mínimo hoje <b>'+intf(Math.ceil(T.reqToday))+'/dia</b></span><span>ritmo 7d <b>'+intf(Math.round(T.pace))+'/dia</b></span>'+lgStatusChip(T)+'</div></div>'; }
+function lgChart(elId, T, mapG, mapM){
+  var rows=T.rows; if(!el(elId)) return;
+  if(!rows.length){ el(elId).innerHTML='<div class="empty">A meta ainda não começou.</div>'; return; }
+  var W=760,H=250,pl=40,pr=12,pt=20,pb=24,pw=W-pl-pr,ph=H-pt-pb,base=pt+ph;
+  var maxV=Math.max.apply(null,rows.map(function(r){return Math.max(r.got,r.req);}).concat([1]))*1.1;
+  var n=rows.length, gw=pw/n, bw=Math.max(4,Math.min(26,gw*0.58));
+  function y(v){ return base-ph*Math.min(1,v/maxV); }
+  var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
+  [0,0.5,1].forEach(function(f){ var yy=pt+ph*(1-f); s+='<line x1="'+pl+'" y1="'+yy+'" x2="'+(W-pr)+'" y2="'+yy+'" stroke="#182034" stroke-dasharray="2 3"/><text x="'+(pl-4)+'" y="'+(yy+3)+'" text-anchor="end" fill="#586a8c" font-size="9">'+intf(maxV*f)+'</text>'; });
+  rows.forEach(function(r,i){ var xc=pl+gw*i+gw/2, g=+mapG[r.date]||0, m=+mapM[r.date]||0, op=r.partial?' opacity=".45"':'';
+    var hm=ph*Math.min(1,m/maxV), hg=ph*Math.min(1,g/maxV);
+    if(m>0) s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-hm).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+hm.toFixed(1)+'" rx="1.5" fill="'+COL.cy+'"'+op+'/>';
+    if(g>0) s+='<rect x="'+(xc-bw/2).toFixed(1)+'" y="'+(base-hm-hg).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+hg.toFixed(1)+'" rx="1.5" fill="'+COL.vi+'"'+op+'/>';
+    var dy=Math.max(pt-8, y(r.got)-8);
+    s+= r.partial ? '<circle cx="'+xc.toFixed(1)+'" cy="'+dy.toFixed(1)+'" r="3.4" fill="none" stroke="#8093b3" stroke-width="1.3"/>'
+                  : '<circle cx="'+xc.toFixed(1)+'" cy="'+dy.toFixed(1)+'" r="3.4" fill="'+(r.ok?'#34d399':'#f2637e')+'"/>';
+  });
+  var path=''; rows.forEach(function(r,i){ var x0=(pl+gw*i).toFixed(1), x1=(pl+gw*(i+1)).toFixed(1), yy=y(r.req).toFixed(1); path+=(i?' L':'M')+x0+' '+yy+' L'+x1+' '+yy; });
+  s+='<path d="'+path+'" fill="none" stroke="#f5b041" stroke-width="2" stroke-dasharray="6 3"/>';
+  var lr=rows[rows.length-1]; s+='<text x="'+(W-pr)+'" y="'+(y(lr.req)-6).toFixed(1)+'" text-anchor="end" fill="#f5b041" font-size="10.5" font-weight="700">mín. '+intf(lr.reqC)+'/dia</text>';
+  xticks(rows).forEach(function(i){ s+='<text x="'+(pl+gw*i+gw/2).toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" fill="#586a8c" font-size="9">'+fmtBR(rows[i].date)+'</text>'; });
+  s+=hitRects(rows,pl,gw,pt,ph)+'</svg>';
+  el(elId).innerHTML='<div class="chart">'+s+'</div><div class="chart-legend wrap">'
+    +'<span><span class="dot" style="background:'+COL.vi+'"></span>Google</span><span><span class="dot" style="background:'+COL.cy+'"></span>Meta</span>'
+    +'<span><span class="ln" style="background:#f5b041"></span>mínimo do dia p/ a meta</span>'
+    +'<span><span class="dot" style="background:#34d399;border-radius:50%"></span>bateu o mínimo</span><span><span class="dot" style="background:#f2637e;border-radius:50%"></span>abaixo</span><span><span class="dot" style="border:1.3px solid #8093b3;border-radius:50%;background:none"></span>hoje (parcial)</span></div>';
+  bindHits(elId, rows, function(r){ var g=+mapG[r.date]||0, m=+mapM[r.date]||0, diff=r.got-r.reqC;
+    return '<div class="tt-d">'+fmtBR(r.date)+(r.partial?' · hoje (parcial)':'')+'</div>'
+      +'<div class="tt-r"><span style="color:'+COL.vi2+'">Google</span><b>'+intf(g)+'</b></div>'
+      +'<div class="tt-r"><span style="color:'+COL.cy+'">Meta</span><b>'+intf(m)+'</b></div>'
+      +'<div class="tt-r"><span>Total tráfego</span><b>'+intf(r.got)+'</b></div>'
+      +'<div class="tt-r"><span style="color:#f5b041">Mínimo do dia</span><b>'+intf(r.reqC)+'</b></div>'
+      +'<div class="tt-sub">'+(r.partial?'dia em andamento':(r.ok?'<b class="g-ok">✓ bateu (+'+intf(diff)+')</b>':'<b class="g-bad">✗ abaixo ('+intf(diff)+')</b>'))+' · acumulado <b>'+intf(r.cumBefore+r.got)+'</b> ('+pct(dv(r.cumBefore+r.got,T.G)*100)+')</div>'; });
+}
+function leadGoalCard(){
+  if(!lgOn()) return null;
+  var LG=D.leadGoal, G=+LG.total, E=LG.date, S=lgStart(), sg=+LG.google||0, sm=+LG.meta||0, dl=fmtBR(E);
+  var M=lgTrafficMaps(), T=lgTrack(M.total,G,S,E), TG=lgTrack(M.google,G*sg,S,E), TM=lgTrack(M.meta,G*sm,S,E);
+  var pctDone=clamp(T.achieved/G);
+  var nearTol=Math.max(1,T.idealBefore*0.01);   // ate 1% do ideal = "no limite" (nao alarma por poucos leads)
+  var heroCls = T.done?' okdone':(T.over||-T.ahead>nearTol?' behind':'');
+  var heroVal = T.done?'Meta batida 🎉':T.over?'Prazo encerrado':intf(Math.ceil(T.reqToday))+'<span class="gh-u">leads/dia</span>';
+  var heroLab = T.done?'já são <b>'+intf(T.achieved)+'</b> leads de tráfego'
+              : T.over?'o prazo de '+dl+' passou · faltaram <b>'+intf(G-T.achieved)+'</b>'
+              : 'é o <b>mínimo por dia</b> (Google + Meta) de hoje até <b>'+dl+'</b> p/ chegar a <b>'+intf(G)+'</b> leads de tráfego';
+  var plan = T.over||T.done ? '' : (T.ahead>=0
+      ? '<div class="lg-status ok">✅ <b>Dentro do planejado</b> — até ontem foram <b>'+intf(T.before)+'</b> leads de tráfego, <b>'+intf(Math.round(T.ahead))+' acima</b> do ritmo ideal ('+intf(Math.round(T.idealBefore))+').</div>'
+      : (-T.ahead<=nearTol
+        ? '<div class="lg-status near">🟡 <b>No limite do planejado</b> — até ontem foram <b>'+intf(T.before)+'</b> leads de tráfego, só <b>'+intf(Math.round(-T.ahead))+'</b> abaixo do ritmo ideal ('+intf(Math.round(T.idealBefore))+'). Bater o mínimo de hoje mantém no plano.</div>'
+        : '<div class="lg-status bad">⚠️ <b>Atrás do planejado</b> — até ontem foram <b>'+intf(T.before)+'</b> leads de tráfego, faltam <b>'+intf(Math.round(-T.ahead))+'</b> p/ o ritmo ideal ('+intf(Math.round(T.idealBefore))+'). Por isso o mínimo/dia subiu.</div>'));
+  var today = T.over||T.done ? '' : '<div class="lg-today"><span>Hoje até agora: <b>'+intf(T.today)+'</b> de <b>'+intf(Math.ceil(T.reqToday))+'</b></span>'
+      +'<div class="gb-track xs"><span class="gb-fill" style="width:'+(clamp(dv(T.today,T.reqToday))*100).toFixed(1)+'%"></span></div><small>dia em andamento · atualiza a cada 3h</small></div>';
+  // "mantendo 80% Google": ≥ alvo = no alvo · até 2 pp abaixo = perto · mais que isso = abaixo
+  var shareG=dv(TG.achieved,TG.achieved+TM.achieved), gap=(shareG-sg)*100;
+  var shareSt = gap>=0 ? ['g-ok','no alvo ✓'] : gap>-2 ? ['g-bad','perto do alvo'] : ['g-bad','abaixo do alvo'];
+  var share='<div class="lg-share"><div class="lg-share-top"><span><b>Divisão dos leads de tráfego</b> · alvo <b>'+Math.round(sg*100)+'% Google</b> / '+Math.round(sm*100)+'% Meta</span>'
+      +'<span class="'+shareSt[0]+'"><b>Google '+pct(shareG*100)+'</b> ('+(gap>=0?'+':'')+nf1.format(gap)+' pp) · '+shareSt[1]+'</span></div>'
+      +'<div class="lg-share-bar"><span style="width:'+(shareG*100).toFixed(1)+'%;background:'+COL.vi+'"></span><span style="width:'+((1-shareG)*100).toFixed(1)+'%;background:'+COL.cy+'"></span><i style="left:'+(sg*100)+'%" title="alvo '+Math.round(sg*100)+'%"></i></div></div>';
+  var days=T.rows.slice().reverse();
+  var tbl='<details class="lg-days"><summary>📅 Ver dia a dia (tabela)</summary><div class="table-scroll"><table class="tbl lg-tbl"><thead><tr><th>Dia</th><th class="num">Google</th><th class="num">Meta</th><th class="num">Total</th><th class="num">Mínimo do dia</th><th class="num">Saldo</th><th class="num">Acumulado</th><th class="num">% da meta</th></tr></thead><tbody>'
+      +days.map(function(r){ var diff=r.got-r.reqC, ac=r.cumBefore+r.got;
+        return '<tr'+(r.partial?' class="lg-part"':'')+'><td>'+fmtBR(r.date)+(r.partial?' <small>hoje</small>':'')+'</td><td class="num">'+intf(M.google[r.date]||0)+'</td><td class="num">'+intf(M.meta[r.date]||0)+'</td><td class="num"><b>'+intf(r.got)+'</b></td><td class="num">'+intf(r.reqC)+'</td>'
+          +'<td class="num">'+(r.partial?'<small style="color:var(--muted2)">em andamento</small>':'<b class="'+(r.ok?'g-ok':'g-bad')+'">'+(diff>=0?'+':'')+intf(diff)+'</b>')+'</td><td class="num">'+intf(ac)+'</td><td class="num">'+pct(dv(ac,G)*100)+'</td></tr>'; }).join('')
+      +'</tbody></table></div></details>';
+  var html='<div class="card goalcard lgcard"><div class="card-h">🎯 Meta de leads do tráfego <span class="hint">'+intf(G)+' leads pagos (utm Google Ads + Facebook Ads) até '+dl+' · '+Math.round(sg*100)+'% Google · base completa · o mínimo/dia se reajusta sozinho a cada dia</span></div>'
+    +'<div class="goal-grid"><div class="goal-hero'+heroCls+'"><div class="gh-val">'+heroVal+'</div><div class="gh-lab">'+heroLab+'</div></div>'
+    +'<div class="goal-side"><div class="goal-bar">'+lgBar(T)+'<div class="gb-legend"><span>Captados <b>'+intf(T.achieved)+'</b> ('+pct(pctDone*100)+')</span><span class="gb-ideal-l">▏ritmo ideal até ontem</span><span>Meta <b>'+intf(G)+'</b></span></div></div>'
+    +'<div class="goal-chips lg-chips"><div class="gchip"><div class="gc-v">'+intf(Math.max(0,G-T.achieved))+'</div><div class="gc-l">faltam</div></div>'
+    +'<div class="gchip"><div class="gc-v">'+intf(T.daysLeft)+'</div><div class="gc-l">dias restantes</div></div>'
+    +'<div class="gchip"><div class="gc-v">'+intf(Math.round(T.pace))+'</div><div class="gc-l">ritmo 7 dias /dia</div></div>'
+    +'<div class="gchip"><div class="gc-v '+(T.projected>=G?'g-ok':'g-bad')+'">'+intf(Math.round(T.projected))+'</div><div class="gc-l">projeção em '+dl+'</div></div></div>'
+    +'</div></div>'+plan+today
+    +'<div class="lg-split">'+lgChRow('Google Ads',COL.vi,TG)+lgChRow('Meta Ads',COL.cy,TM)+'</div>'+share
+    +'<div class="lg-sub-h">Leads de tráfego por dia × mínimo do dia <span class="hint">'+intf(T.okDays)+' de '+intf(T.nDays)+' dias fechados bateram o mínimo · passe o mouse nas barras</span></div><div id="lgChart"></div>'
+    +tbl+'</div>';
+  return {html:html, after:function(){ lgChart('lgChart',T,M.google,M.meta); }};
+}
+/* metas por SEGMENTO de lead (L22) — regra de cada segmento definida no build (SegKeys) */
+var SEGINFO={
+  instagram:{dot:'#e46aa7', rule:'stories + link na bio · perfil principal'},
+  manychat:{dot:'#5b8def', rule:'utm_source manychat'},
+  youtube:{dot:'#ff5a5a', rule:'utm_source youtube · descrição + chat da live'},
+  alunos:{dot:'#5eead4', rule:'tráfego p/ a página de alunos + utm alunos'},
+  antigos:{dot:'#25d366', rule:'utm_source whatsapp · grupos'}
+};
+function segGoalsCard(){
+  var SG=arr(D.segGoals); if(!SG.length||!lgOn()) return '';
+  var S=lgStart(), E=D.leadGoal.date, dl=fmtBR(E), maps={}, antAds=0, tISO=todayISO();
+  SG.forEach(function(g){ maps[g.key]={}; });
+  arr(D.segDaily).forEach(function(r){ if(!isDate(r.date)) return; var v=r.vals||{};
+    SG.forEach(function(g){ if(+v[g.key]) maps[g.key][r.date]=+v[g.key]; }); antAds+=+v._antigosAds||0; });
+  var segs=SG.map(function(g){ var T=lgTrack(maps[g.key],+g.goal,S,E), by={}; T.rows.forEach(function(r){ by[r.date]=r; });
+    return {g:g, T:T, by:by, info:SEGINFO[g.key]||{dot:'#8093b3',rule:''}}; });
+  var rowsHtml=segs.map(function(x){ var T=x.T, p=clamp(T.G>0?T.achieved/T.G:0);
+    return '<div class="seg-row"><div class="seg-l"><span class="dot" style="background:'+x.info.dot+'"></span><div><b>'+esc(x.g.label)+'</b><small>'+esc(x.info.rule)+'</small></div></div>'
+      +'<div class="seg-mid">'+lgBar(T,x.info.dot,'sm')+'<div class="seg-nums"><span><b>'+intf(T.achieved)+'</b> de '+intf(T.G)+' · <b>'+pct(p*100)+'</b></span><span>faltam <b>'+intf(Math.max(0,T.G-T.achieved))+'</b> · projeção '+dl+' <b class="'+(T.projected>=T.G?'g-ok':'g-bad')+'">'+intf(Math.round(T.projected))+'</b></span></div></div>'
+      +'<div class="seg-k"><div class="v">'+(T.done?'—':intf(Math.ceil(T.reqToday)))+'</div><div class="l">mínimo/dia</div></div>'
+      +'<div class="seg-k"><div class="v">'+intf(Math.round(T.pace))+'</div><div class="l">ritmo 7 dias</div></div>'
+      +'<div class="seg-st">'+lgStatusChip(T)+'</div></div>'; }).join('');
+  // matriz diária: linha = dia, coluna = segmento; verde = bateu o mínimo do dia, vermelho = abaixo, cinza = hoje (parcial)
+  var dates=segs.length?segs[0].T.rows.map(function(r){return r.date;}).reverse():[];
+  var head='<thead><tr><th>Dia</th>'+segs.map(function(x){ return '<th class="num"><span class="dot" style="background:'+x.info.dot+'"></span>'+esc(x.g.label)+'</th>'; }).join('')+'<th class="num">Total</th></tr>'
+    +'<tr class="seg-req"><td>mínimo hoje</td>'+segs.map(function(x){ return '<td class="num">'+(x.T.done?'✓':intf(Math.ceil(x.T.reqToday)))+'</td>'; }).join('')+'<td></td></tr></thead>';
+  var body=dates.map(function(d){ var tot=0;
+    var cells=segs.map(function(x){ var r=x.by[d]; if(!r) return '<td class="num">—</td>'; tot+=r.got;
+      var cls=r.partial?'seg-part':(r.ok?'seg-ok':'seg-bad');
+      return '<td class="num '+cls+'" title="mínimo do dia: '+intf(r.reqC)+'">'+intf(r.got)+'</td>'; }).join('');
+    return '<tr'+(d===tISO?' class="lg-part"':'')+'><td>'+fmtBR(d)+(d===tISO?' <small>hoje</small>':'')+'</td>'+cells+'<td class="num"><b>'+intf(tot)+'</b></td></tr>'; }).join('');
+  var foot='<tfoot><tr><td>Acumulado</td>'+segs.map(function(x){ return '<td class="num"><b>'+intf(x.T.achieved)+'</b></td>'; }).join('')+'<td class="num"><b>'+intf(segs.reduce(function(s,x){return s+x.T.achieved;},0))+'</b></td></tr>'
+    +'<tr><td>% da meta</td>'+segs.map(function(x){ return '<td class="num">'+pct(dv(x.T.achieved,x.T.G)*100)+'</td>'; }).join('')+'<td></td></tr></tfoot>';
+  // notas de transparência: o que NÃO entra em cada segmento
+  var igDirect=0, wl=0; arr(D.channelSub).forEach(function(c){ if(c.label==='Instagram') arr(c.subs).forEach(function(s){ if(s.label==='direct') igDirect=+s.n||0; }); });
+  arr(D.channels).forEach(function(c){ if(/^Instagram · /.test(c.label)) wl+=+c.n||0; });
+  var notes='<div class="seg-notes">'
+    +'<span>📌 <b>Instagram</b> conta só stories + link na bio do perfil principal'+(igDirect||wl?' — ficam fora: direct ('+intf(igDirect)+')'+(wl?' e Instagram · Wladir ('+intf(wl)+')':''):'')+'.</span>'
+    +'<span>📌 <b>Alunos</b> = tráfego (Meta/Google) que caiu na página de alunos + utm alunos.</span>'
+    +'<span>📌 <b>Leads antigos</b> = só utm whatsapp (combinado com o time)'+(antAds?' — os <b>'+intf(antAds)+'</b> leads de tráfego p/ a página de leads antigos não entram aqui':'')+'.</span></div>';
+  return '<div class="card goalcard segcard"><div class="card-h">🧩 Metas por segmento de lead <span class="hint">prazo '+dl+' · início '+fmtBR(S)+' · o mínimo/dia de cada segmento se reajusta sozinho · base completa</span></div>'
+    +'<div class="seg-rows">'+rowsHtml+'</div>'
+    +'<div class="lg-sub-h">Acompanhamento diário por segmento <span class="hint"><b class="g-ok">verde</b> = bateu o mínimo do dia · <b class="g-bad">vermelho</b> = abaixo · passe o mouse p/ ver o mínimo</span></div>'
+    +'<div class="table-scroll seg-tblwrap"><table class="tbl seg-tbl">'+head+'<tbody>'+body+'</tbody>'+foot+'</table></div>'+notes+'</div>';
+}
+function mountLeadGoals(){ var a=el('leadGoalWrap'), b=el('segGoalWrap'); if(!a||!b) return;
+  try{ var LGc=leadGoalCard(); a.innerHTML=LGc?LGc.html:''; if(LGc) LGc.after(); b.innerHTML=segGoalsCard(); }
+  catch(e){ a.innerHTML=''; b.innerHTML=''; if(window.console) console.error('metas de leads:',e); } }
 
 /* =================== CHROME =================== */
 function periodsHTML(){

@@ -38,7 +38,18 @@ $FUNNELS = @(
     leadsId='1xrHSoS1bg5O8VL22AFv1FY2xuWHnpHrsY_R3lzXhJ70';   leadsGid='1446265479'
     tagMust='^SIP-L22$'
     goalSpend=200000; goalDate='2026-11-09'
-    goalSplit=@{ google=0.80; meta=0.20 } }   # meta 200k ate 09/11 · divisao 80% Google / 20% Meta
+    goalSplit=@{ google=0.80; meta=0.20 }   # meta 200k ate 09/11 · divisao 80% Google / 20% Meta
+    # meta de LEADS DO TRAFEGO (19/10): 39k leads pagos (utm Google Ads + Facebook Ads) ate 09/11,
+    # mantendo 80% Google. start = 1o dia de trafego do L22 (base do "ritmo ideal").
+    leadGoal=@{ total=39000; date='2026-11-09'; start='2026-10-07'; google=0.80; meta=0.20 }
+    # metas por SEGMENTO de lead (definicao do time 19/10; regras em SegKeys). Prazo/inicio = leadGoal.
+    segGoals=@(
+      [ordered]@{ key='instagram'; label='Instagram';     goal=10000 }
+      [ordered]@{ key='manychat';  label='ManyChat';      goal=1500 }
+      [ordered]@{ key='youtube';   label='YouTube';       goal=2000 }
+      [ordered]@{ key='alunos';    label='Alunos';        goal=5000 }
+      [ordered]@{ key='antigos';   label='Leads antigos'; goal=5000 }
+    ) }
 )
 $TAX  = 1.1385          # imposto Meta (+13,85%) aplicado no gasto do Meta
 $TAXG = 1.0             # Google Ads NAO tem imposto
@@ -150,6 +161,21 @@ function SrcSub($chan,$term,$cont){
   $t=([string]$term).Trim().ToLower(); if($t -ne ''){ return $t }
   $c=([string]$cont).Trim().ToLower(); if($c -ne ''){ return $c }
   return '(sem detalhe)' }
+# SEGMENTOS de lead p/ as metas por segmento (definicao do time L22, 19/10/2026). Devolve as chaves que o lead conta:
+#  instagram = utm_source instagram (perfil principal) c/ utm_term bio ou stories (direct e instagram-<perfil> NAO contam)
+#  manychat  = utm_source manychat  ·  youtube = utm_source youtube
+#  alunos    = utm_source alunos  +  TRAFEGO (Facebook/Google Ads) que caiu na pagina de alunos (/l22-alunos)
+#  antigos   = utm_source whatsapp (grupos de leads antigos) - o time confirmou que NAO inclui trafego
+#  _antigosAds = so informativo: trafego p/ a pagina de leads antigos (fora da meta "Leads antigos")
+function SegKeys($src,$term,$page){ $s=Deaccent $src; $t=Deaccent $term; $p=Deaccent $page; $k=@()
+  $isAd = ($s -like 'facebook*' -or $s -eq 'fb-ads' -or $s -eq 'fb' -or $s -like 'google*')
+  if($s -eq 'instagram' -and ($t -eq 'bio' -or $t -eq 'stories')){ $k+='instagram' }
+  if($s -eq 'manychat'){ $k+='manychat' }
+  if($s -eq 'youtube' -or $s -eq 'yt'){ $k+='youtube' }
+  if($s -eq 'alunos' -or ($isAd -and $p -match 'alunos')){ $k+='alunos' }
+  if($s -eq 'whatsapp' -or $s -eq 'wpp'){ $k+='antigos' }
+  if($isAd -and $p -match 'leads-?antigos'){ $k+='_antigosAds' }
+  return ,$k }
 function BumpSub($h,$a,$b){ if($null -eq $b -or $b -eq ''){return}; if(-not $h.ContainsKey($a)){ $h[$a]=@{} }; Bump $h[$a] $b }
 function SubArr($h){ $out=@(); foreach($k in $h.Keys){ $out+=[pscustomobject]@{label=[string]$k; subs=(DistArr $h[$k])} }; return ,@($out) }
 # --- utm_campaign p/ o filtro da aba Perfil ---
@@ -366,6 +392,7 @@ function Build-Funnel($cfg){
   $adPageVotes=@{}  # chave canal|camp|adset|ad -> {page: contagem} (pra mapear anuncio->landing page via leads)
   $adsetPageVotes=@{}; $campPageVotes=@{}  # fallback: canal|camp|adset e canal|camp -> {page: contagem}
   $tagMust = if($cfg.Contains('tagMust') -and $cfg.tagMust){ [string]$cfg.tagMust } else { '' }; $nForeign=0
+  $segOn = [bool]($cfg.Contains('segGoals') -and $cfg.segGoals); $segDay=@{}   # leads/dia por segmento (so funis c/ segGoals)
   if($leadsOk){ foreach($r in $ld){
     if($null -eq $r -or $r.Count -le $L_UCAMP){ continue }
     $mail=Norm $r[$L_MAIL]
@@ -405,6 +432,7 @@ function Build-Funnel($cfg){
       if(-not $srcDay[$d].ContainsKey($rede)){ $srcDay[$d][$rede]=0 }; $srcDay[$d][$rede]++
       if(-not $paidDay.ContainsKey($d)){ $paidDay[$d]=@{pago=0;org=0} }
       if($paid){ $paidDay[$d].pago++ } else { $paidDay[$d].org++ }
+      if($segOn){ foreach($sk in (SegKeys $src $term $page)){ if(-not $segDay.ContainsKey($d)){ $segDay[$d]=@{} }; Bump $segDay[$d] $sk } }
     }
     $em=$mail.ToLower(); if($em -ne ''){ $leadMails[$em]=$true; if(-not $leadUtm.ContainsKey($em)){ $leadUtm[$em]=@{s=$chan; m=(Deaccent $med); c=$camp; t=$tag} } }
     $leadRows.Add([pscustomobject]@{date=$d;paid=$paid;channel=$chan;sub=$sub;plat=$plat;state=$stt;city=$cty;camp=$cName;adset=$sName;ad=$aName;qmail=$em;tag=$tag})
@@ -585,6 +613,8 @@ function Build-Funnel($cfg){
   $paidDaily = @()
   foreach($dt in ($paidDay.Keys | Sort-Object)){ if($dt -notmatch '^\d{4}-\d{2}-\d{2}$'){continue}
     $paidDaily += [pscustomobject]@{ date=$dt; pago=[int]$paidDay[$dt].pago; org=[int]$paidDay[$dt].org } }
+  $segDaily = @()
+  foreach($dt in ($segDay.Keys | Sort-Object)){ $segDaily += [pscustomobject]@{ date=$dt; vals=[pscustomobject]$segDay[$dt] } }
 
   $paidCount=@($leadRows|Where-Object{$_.paid}).Count
   $attribCount=@($leadRows|Where-Object{$_.plat -ne ''}).Count
@@ -629,6 +659,8 @@ function Build-Funnel($cfg){
     channels=(DistArr $dChannel); channelSub=(SubArr $dChSub); geo=(DistArr $dState); cities=(DistArr $dCity)
     fases=@($faseKeys); faseAgg=[pscustomobject]$faseAgg
     srcOrder=@($srcOrder); srcDaily=@($srcDaily); paidDaily=@($paidDaily)
+    leadGoal=$(if($cfg.Contains('leadGoal') -and $cfg.leadGoal){ [pscustomobject]$cfg.leadGoal }else{ $null })
+    segGoals=$(if($segOn){ @($cfg.segGoals | ForEach-Object { [pscustomobject]$_ }) }else{ @() }); segDaily=@($segDaily)
     pagesRows=@($pagesRows)
 
     engage=[pscustomobject]@{

@@ -64,7 +64,7 @@
     <div class="funil-grid">
       <div class="kpi-col" id="kpiCol"></div>
       <div class="chart-col">
-        <div class="card"><div class="card-h">Leads por dia <span class="hint">barras = leads captados · <b>ciano</b> pago · <b>violeta</b> orgânico</span></div><div id="chartLeads"></div></div>
+        <div class="card"><div class="card-h">Leads por dia <span class="hint">barras = leads atribuídos · <b>ciano</b> Meta · <b>violeta</b> Google · <b style="color:#f5b041">- - âmbar</b> = mínimo/dia p/ a meta de leads (quando o funil tem meta)</span></div><div id="chartLeads"></div></div>
         <div class="card"><div class="card-h">Investimento x CPL por dia <span class="hint">barras = gasto c/ imposto · linha = custo por lead</span></div><div id="chartInvest"></div></div>
         <div class="card" id="hotColdCard"><div class="card-h">Investimento por dia · público quente x frio <span class="hint">% do gasto/dia · <b style="color:#f2764e">quente</b> (remarketing/RMKT/QUENTE) · <b style="color:#38bdf8">frio</b> (prospecção/FRIO/lookalike)</span></div><div id="chartHotCold"></div></div>
       </div>
@@ -85,6 +85,8 @@
 
   <!-- ============ LEADS · VISÃO GERAL ============ -->
   <section class="panel-tab hidden" id="tab-leads">
+    <div id="leadGoalWrap"></div>
+    <div id="segGoalWrap"></div>
     <div class="card">
       <div class="card-h">Retrato da captação <span class="hint">todos os leads reais da planilha (exclui testes) · base completa</span></div>
       <div class="verdict" id="verdict"></div>
