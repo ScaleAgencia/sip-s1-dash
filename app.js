@@ -942,6 +942,7 @@ function leadGoalCard(){
 /* metas por SEGMENTO de lead (L22) — regra de cada segmento definida no build (SegKeys) */
 var SEGINFO={
   instagram:{dot:'#e46aa7', rule:'stories + link na bio · perfil principal'},
+  igdirect:{dot:'#f59ecb', rule:'utm_source instagram · utm_term direct'},
   manychat:{dot:'#5b8def', rule:'utm_source manychat'},
   youtube:{dot:'#ff5a5a', rule:'utm_source youtube · descrição + chat da live'},
   alunos:{dot:'#5eead4', rule:'tráfego p/ a página de alunos + utm alunos'},
@@ -973,10 +974,12 @@ function segGoalsCard(){
   var foot='<tfoot><tr><td>Acumulado</td>'+segs.map(function(x){ return '<td class="num"><b>'+intf(x.T.achieved)+'</b></td>'; }).join('')+'<td class="num"><b>'+intf(segs.reduce(function(s,x){return s+x.T.achieved;},0))+'</b></td></tr>'
     +'<tr><td>% da meta</td>'+segs.map(function(x){ return '<td class="num">'+pct(dv(x.T.achieved,x.T.G)*100)+'</td>'; }).join('')+'<td></td></tr></tfoot>';
   // notas de transparência: o que NÃO entra em cada segmento
-  var igDirect=0, wl=0; arr(D.channelSub).forEach(function(c){ if(c.label==='Instagram') arr(c.subs).forEach(function(s){ if(s.label==='direct') igDirect=+s.n||0; }); });
+  var hasDirect=SG.some(function(g){ return g.key==='igdirect'; }), igDirect=0, wl=0;
+  arr(D.channelSub).forEach(function(c){ if(c.label==='Instagram') arr(c.subs).forEach(function(s){ if(s.label==='direct') igDirect=+s.n||0; }); });
   arr(D.channels).forEach(function(c){ if(/^Instagram · /.test(c.label)) wl+=+c.n||0; });
+  var igOut=[]; if(!hasDirect && igDirect) igOut.push('direct ('+intf(igDirect)+')'); if(wl) igOut.push('Instagram · Wladir ('+intf(wl)+')');
   var notes='<div class="seg-notes">'
-    +'<span>📌 <b>Instagram</b> conta só stories + link na bio do perfil principal'+(igDirect||wl?' — ficam fora: direct ('+intf(igDirect)+')'+(wl?' e Instagram · Wladir ('+intf(wl)+')':''):'')+'.</span>'
+    +'<span>📌 <b>Instagram</b> conta só stories + link na bio do perfil principal'+(hasDirect?'; o <b>direct</b> tem meta própria (Instagram Direct)':'')+(igOut.length?' — fica fora: '+igOut.join(' e '):'')+'.</span>'
     +'<span>📌 <b>Alunos</b> = tráfego (Meta/Google) que caiu na página de alunos + utm alunos.</span>'
     +'<span>📌 <b>Leads antigos</b> = só utm whatsapp (combinado com o time)'+(antAds?' — os <b>'+intf(antAds)+'</b> leads de tráfego p/ a página de leads antigos não entram aqui':'')+'.</span></div>';
   return '<div class="card goalcard segcard"><div class="card-h">🧩 Metas por segmento de lead <span class="hint">prazo '+dl+' · início '+fmtBR(S)+' · o mínimo/dia de cada segmento se reajusta sozinho · base completa</span></div>'

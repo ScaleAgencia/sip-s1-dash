@@ -48,6 +48,7 @@ $FUNNELS = @(
     # metas por SEGMENTO de lead (definicao do time 19/10; regras em SegKeys). Prazo/inicio = leadGoal.
     segGoals=@(
       [ordered]@{ key='instagram'; label='Instagram';     goal=10000 }
+      [ordered]@{ key='igdirect';  label='Instagram Direct'; goal=900 }   # add 20/10 (Vitor): utm instagram + term direct
       [ordered]@{ key='manychat';  label='ManyChat';      goal=1500 }
       [ordered]@{ key='youtube';   label='YouTube';       goal=2000 }
       [ordered]@{ key='alunos';    label='Alunos';        goal=5000 }
@@ -165,7 +166,8 @@ function SrcSub($chan,$term,$cont){
   $c=([string]$cont).Trim().ToLower(); if($c -ne ''){ return $c }
   return '(sem detalhe)' }
 # SEGMENTOS de lead p/ as metas por segmento (definicao do time L22, 19/10/2026). Devolve as chaves que o lead conta:
-#  instagram = utm_source instagram (perfil principal) c/ utm_term bio ou stories (direct e instagram-<perfil> NAO contam)
+#  instagram = utm_source instagram (perfil principal) c/ utm_term bio ou stories (instagram-<perfil> NAO conta)
+#  igdirect  = utm_source instagram c/ utm_term direct (meta propria, add 20/10)
 #  manychat  = utm_source manychat  ·  youtube = utm_source youtube
 #  alunos    = utm_source alunos  +  TRAFEGO (Facebook/Google Ads) que caiu na pagina de alunos (/l22-alunos)
 #  antigos   = utm_source whatsapp (grupos de leads antigos) - o time confirmou que NAO inclui trafego
@@ -173,6 +175,7 @@ function SrcSub($chan,$term,$cont){
 function SegKeys($src,$term,$page){ $s=Deaccent $src; $t=Deaccent $term; $p=Deaccent $page; $k=@()
   $isAd = ($s -like 'facebook*' -or $s -eq 'fb-ads' -or $s -eq 'fb' -or $s -like 'google*')
   if($s -eq 'instagram' -and ($t -eq 'bio' -or $t -eq 'stories')){ $k+='instagram' }
+  if($s -eq 'instagram' -and $t -eq 'direct'){ $k+='igdirect' }
   if($s -eq 'manychat'){ $k+='manychat' }
   if($s -eq 'youtube' -or $s -eq 'yt'){ $k+='youtube' }
   if($s -eq 'alunos' -or ($isAd -and $p -match 'alunos')){ $k+='alunos' }
