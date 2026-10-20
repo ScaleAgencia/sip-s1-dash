@@ -25,7 +25,10 @@ $FUNNELS = @(
     surveyTabs=@('pesquisa','pesquisa_s4')   # S4 caiu numa aba de pesquisa separada (add 22/09); le e junta as duas
     goalSpend=0; goalDate=''
     # metas de investimento POR FASE (tag do lead) · com impostos · chave = tag exata
-    faseGoals=@{ 'SIP-S5'=@{ spend=5000; date='2026-10-12' }; 'SIP-S6'=@{ spend=5000; date='2026-10-19' } } }
+    faseGoals=@{ 'SIP-S5'=@{ spend=5000; date='2026-10-12' }; 'SIP-S6'=@{ spend=5000; date='2026-10-19' } }
+    # remapeia a DATA das linhas de anuncio (Meta+Google) -> o gasto do dia conta em outro dia.
+    # 20/10/2026: pedido do usuario - o gasto de 20/10 (fim do S6) conta em 19/10 e o dia 20 fica zerado.
+    spendShift=@{ '2026-10-20'='2026-10-19' } }
   [ordered]@{ key='l21'; label='SIP-L21';
     queriesId='1MzEn8jtxvEQbAWgA1Btg1cL5Q-mB3oA8KygVJfrgszo'; metaGid='0'; googleGid='1609119011';
     # (Google agora consolida TODAS as campanhas numa aba so, gid 1609119011 -> sem abas extras.
@@ -370,7 +373,9 @@ function Build-Funnel($cfg){
   $daily=@{}; $grain=@{}
 
   # ---- META queries (gasto x imposto, com Reach/LPV) ----
+  $shift = if($cfg.Contains('spendShift') -and $cfg.spendShift){ $cfg.spendShift } else { @{} }   # data do anuncio -> data onde conta
   foreach($r in $qd){ if($null -eq $r -or $r.Count -le $Q_DAY){continue}; $d=Norm $r[$Q_DAY]; if($d -notmatch '^\d{4}-\d{2}-\d{2}$'){continue}
+    if($shift.ContainsKey($d)){ $d=[string]$shift[$d] }
     $sp=(MoneyBR $r[$Q_SPEND])*$TAX; $im=ToInt $r[$Q_IMP]; $rc=ToInt $r[$Q_REACH]; $ck=ToInt (Cell $r $Q_CLK); $lp=ToInt (Cell $r $Q_LPV); $ml=ToInt (Cell $r $Q_ML)
     $o=GetDay 'meta' $d; $o.spend+=$sp;$o.impr+=$im;$o.reach+=$rc;$o.clicks+=$ck;$o.lpv+=$lp;$o.platLeads+=$ml
     $g=GetGrain 'meta' $d (Norm $r[$Q_CAMP]) (Norm (Cell $r $Q_SET)) (Norm (Cell $r $Q_AD))
@@ -379,6 +384,7 @@ function Build-Funnel($cfg){
   # ---- GOOGLE queries (gasto SEM imposto; Clicks; Conversions; sem Reach/LPV) ----
   if($G_DAY -ge 0){ foreach($r in $qgd){ if($null -eq $r -or $r.Count -le $G_DAY){ continue }
     $d=Norm $r[$G_DAY]; if($d -notmatch '^\d{4}-\d{2}-\d{2}$'){continue}
+    if($shift.ContainsKey($d)){ $d=[string]$shift[$d] }
     $sp=(MoneyBR (Cell $r $G_SPEND))*$TAXG; $im=ToInt (Cell $r $G_IMP); $ck=ToInt (Cell $r $G_CLK); $cv=ToInt (Cell $r $G_CONV)
     $o=GetDay 'google' $d; $o.spend+=$sp;$o.impr+=$im;$o.clicks+=$ck;$o.platLeads+=$cv
     $g=GetGrain 'google' $d (Norm (Cell $r $G_CAMP)) (Norm (Cell $r $G_SET)) (Norm (Cell $r $G_AD))
