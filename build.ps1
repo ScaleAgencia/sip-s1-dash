@@ -348,12 +348,25 @@ function Build-Funnel($cfg){
   } catch { $leadsOk=$false; Write-Host ("AVISO: planilha de leads inacessivel ("+$_.Exception.Message+")") }
 
   # ---- indices de coluna (META) ----
-  $Q_DAY=HdrLike $qh 'day'; $Q_CAMP=HdrLike $qh 'campaign name'; $Q_SET=HdrLike $qh 'ad set name'; $Q_AD=HdrLike $qh 'ad name'
-  $Q_SPEND=HdrLike $qh 'amount spent'; $Q_IMP=HdrLike $qh 'impressions'; $Q_REACH=HdrLike $qh 'reach'
-  $Q_CLK=HdrLike $qh 'link clicks'; $Q_LPV=HdrLike $qh 'landing page views'; $Q_ML=HdrLike $qh 'leads'
-  foreach($pair in @(@('Day',$Q_DAY),@('Campaign',$Q_CAMP),@('Ad Set',$Q_SET),@('Amount Spent',$Q_SPEND),@('Reach',$Q_REACH))){
+  # 2 formatos de query Meta aceitos (busca por NOME, ordem nao importa):
+  #  antigo (S1/L21): Day | Campaign Name | Ad Set Name | Ad Name | Amount Spent | Impressions | Reach | Link Clicks | Leads | Landing Page Views
+  #  novo (L22 desde 21/10): Campaign Name | Adset Name | Ad Name | Spend (Cost, Amount Spent) | Impressions |
+  #     Action Landing Page View | Action Link Clicks | Action Omni Initiated Checkout | Date   (SEM Reach e SEM Leads do pixel)
+  $Q_DAY=HdrLike $qh 'day'; if($Q_DAY -lt 0){ $Q_DAY=HdrLike $qh 'date' }
+  $Q_CAMP=HdrLike $qh 'campaign name'
+  $Q_SET=HdrLike $qh 'ad set name'; if($Q_SET -lt 0){ $Q_SET=HdrLike $qh 'adset name' }
+  $Q_AD=HdrLike $qh 'ad name'
+  $Q_SPEND=HdrLike $qh 'amount spent'; if($Q_SPEND -lt 0){ $Q_SPEND=HdrLike $qh '*amount spent*' }; if($Q_SPEND -lt 0){ $Q_SPEND=HdrLike $qh 'spend*' }
+  $Q_IMP=HdrLike $qh 'impressions'
+  $Q_REACH=HdrLike $qh 'reach'; if($Q_REACH -lt 0){ $Q_REACH=HdrLike $qh '*reach*' }   # opcional (formato novo nao tem)
+  $Q_CLK=HdrLike $qh 'link clicks'; if($Q_CLK -lt 0){ $Q_CLK=HdrLike $qh '*link clicks*' }
+  $Q_LPV=HdrLike $qh 'landing page views'; if($Q_LPV -lt 0){ $Q_LPV=HdrLike $qh '*landing page view*' }
+  $Q_ML=HdrLike $qh 'leads'                                       # opcional: leads do pixel (formato novo nao tem)
+  foreach($pat in 'action lead','action leads','action omni lead*','action *lead*'){ if($Q_ML -lt 0){ $Q_ML=HdrLike $qh $pat } }   # se adicionarem no formato novo
+  foreach($pair in @(@('Day/Date',$Q_DAY),@('Campaign',$Q_CAMP),@('Ad Set/Adset',$Q_SET),@('Ad Name',$Q_AD),@('Amount Spent/Spend',$Q_SPEND),@('Impressions',$Q_IMP),@('Link Clicks',$Q_CLK))){
     if($pair[1] -lt 0){ throw ("[$name] Coluna Meta nao encontrada: "+$pair[0]) }
   }
+  if($Q_REACH -lt 0 -or $Q_ML -lt 0 -or $Q_LPV -lt 0){ Write-Host ("  AVISO [$name] query Meta sem: "+((@(@('Reach',$Q_REACH),@('Leads(pixel)',$Q_ML),@('LPV',$Q_LPV)) | Where-Object { $_[1] -lt 0 } | ForEach-Object { $_[0] }) -join ', ')) }
   # ---- indices de coluna (GOOGLE: Ad Group; Cost; Clicks; Conversions; sem Reach/LPV) ----
   $G_DAY=HdrLike $qgh 'day'; $G_CAMP=HdrLike $qgh 'campaign name'; $G_SET=HdrLike $qgh 'ad group name'; $G_AD=HdrLike $qgh 'ad name'
   $G_SPEND=HdrLike $qgh '*cost*'; $G_IMP=HdrLike $qgh 'impressions'; $G_CLK=HdrLike $qgh 'clicks'; $G_CONV=HdrLike $qgh 'conversions'
@@ -379,7 +392,7 @@ function Build-Funnel($cfg){
   $shift = if($cfg.Contains('spendShift') -and $cfg.spendShift){ $cfg.spendShift } else { @{} }   # data do anuncio -> data onde conta
   foreach($r in $qd){ if($null -eq $r -or $r.Count -le $Q_DAY){continue}; $d=Norm $r[$Q_DAY]; if($d -notmatch '^\d{4}-\d{2}-\d{2}$'){continue}
     if($shift.ContainsKey($d)){ $d=[string]$shift[$d] }
-    $sp=(MoneyBR $r[$Q_SPEND])*$TAX; $im=ToInt $r[$Q_IMP]; $rc=ToInt $r[$Q_REACH]; $ck=ToInt (Cell $r $Q_CLK); $lp=ToInt (Cell $r $Q_LPV); $ml=ToInt (Cell $r $Q_ML)
+    $sp=(MoneyBR (Cell $r $Q_SPEND))*$TAX; $im=ToInt (Cell $r $Q_IMP); $rc=ToInt (Cell $r $Q_REACH); $ck=ToInt (Cell $r $Q_CLK); $lp=ToInt (Cell $r $Q_LPV); $ml=ToInt (Cell $r $Q_ML)
     $o=GetDay 'meta' $d; $o.spend+=$sp;$o.impr+=$im;$o.reach+=$rc;$o.clicks+=$ck;$o.lpv+=$lp;$o.platLeads+=$ml
     $g=GetGrain 'meta' $d (Norm $r[$Q_CAMP]) (Norm (Cell $r $Q_SET)) (Norm (Cell $r $Q_AD))
     $g.spend+=$sp;$g.impr+=$im;$g.reach+=$rc;$g.clicks+=$ck;$g.lpv+=$lp;$g.platLeads+=$ml }
