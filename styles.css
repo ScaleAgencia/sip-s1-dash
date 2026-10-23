@@ -549,3 +549,5 @@ tr.lg-part td{background:rgba(128,147,179,.07)} tr.lg-part small{color:var(--mut
 .seg-notes{display:flex;flex-direction:column;gap:5px;margin-top:12px;padding:10px 13px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.5}
 .seg-notes b{color:var(--ink2)}
 .lg-status.near{background:rgba(250,204,21,.07);border-color:rgba(250,204,21,.35);color:#f7ecb5}
+.pg-note.pg-note-info{background:rgba(34,211,238,.06);border-color:rgba(34,211,238,.25)}
+.pg-lpvwarn{color:#f5b041;cursor:help}
