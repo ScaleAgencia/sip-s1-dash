@@ -43,9 +43,15 @@ var daily = arr(D.daily), grain = arr(D.grain), totals = D.totals||{};
 var allDates = daily.map(function(d){return d.date;}).filter(isDate).sort();
 var maxDate = D.dateMax || allDates[allDates.length-1] || '';
 var minDate = D.dateMin || allDates[0] || '';
+// VISITAS DA PÁGINA (base da conversão de página) — padrão da agência:
+//   Meta = landing page views (LPV) · Google = cliques (Google não tem LPV).
+// Toda "conversão de página" da dash = leads ÷ vis (no Geral soma LPV do Meta + cliques do Google).
+function visOf(r){ return r.channel==='google' ? (+r.clicks||0) : (+r.lpv||0); }
+function convLab(ch){ return ch==='google'?'lead ÷ clique':(ch==='meta'?'lead ÷ LPV':'Meta: lead ÷ LPV · Google: lead ÷ clique'); }
 function setFunnelVars(){
   D = (FUN.data&&FUN.data[funKey]) || {};
   daily = arr(D.daily); grain = arr(D.grain); totals = D.totals||{};
+  daily.forEach(function(r){ r.vis=visOf(r); }); grain.forEach(function(r){ r.vis=visOf(r); });
   allDates = daily.map(function(d){return d.date;}).filter(isDate).sort();
   maxDate = D.dateMax || allDates[allDates.length-1] || '';
   minDate = D.dateMin || allDates[0] || '';
@@ -86,12 +92,12 @@ function leadAgg(){
   var fa=(D.faseAgg&&D.faseAgg[fase])||{};
   return {leads:fa.leads||0,paid:fa.paid||0,organic:fa.organic||0,attributed:fa.attributed||0,states:fa.states||0,channels:arr(fa.channels),chSub:arr(fa.chSub),geo:arr(fa.geo),cities:arr(fa.cities)};
 }
-var CHMETS=['spend','impr','reach','clicks','lpv','platLeads','leads','la','lb','lc','mLeads','gLeads'];
+var CHMETS=['spend','impr','reach','clicks','lpv','vis','platLeads','leads','la','lb','lc','mLeads','gLeads'];
 function daysInRange(rng){
   var map={};
   daily.forEach(function(d){ if(!isDate(d.date)||!inRange(d.date,rng)||!chMatch(d)||!faseMatch(d)) return;
     var o=map[d.date]; if(!o){ o={date:d.date}; CHMETS.forEach(function(k){o[k]=0;}); map[d.date]=o; }
-    o.spend+=d.spend||0;o.impr+=d.impr||0;o.reach+=d.reach||0;o.clicks+=d.clicks||0;o.lpv+=d.lpv||0;o.platLeads+=d.platLeads||0;o.leads+=d.leads||0;
+    o.spend+=d.spend||0;o.impr+=d.impr||0;o.reach+=d.reach||0;o.clicks+=d.clicks||0;o.lpv+=d.lpv||0;o.vis+=d.vis||0;o.platLeads+=d.platLeads||0;o.leads+=d.leads||0;
     o.la+=d.la||0;o.lb+=d.lb||0;o.lc+=d.lc||0;
     if(d.channel==='meta')o.mLeads+=d.leads||0; else if(d.channel==='google')o.gLeads+=d.leads||0;
   });
@@ -107,8 +113,8 @@ function relClass(v,med){ if(v==null||!isFinite(v)||v<=0||med<=0) return 'cpl-n'
 /* ---------- métricas úteis (impressão/alcance ficam ocultos; só ratios) ---------- */
 function ctrOf(n){ return dv(n.clicks,n.impr)*100; }              // CTR = clique/impressão
 function cpmOf(n){ return dv(n.spend,n.impr)*1000; }              // CPM = custo/mil impressões
-function convPag(n){ return dv(n.leads,n.clicks)*100; }           // conversão de página = clique→lead
-function convQual(n){ return dv(n.la,n.clicks)*100; }             // conv. de página dos qualificados = clique→Lead A
+function convPag(n){ return dv(n.leads,n.vis)*100; }              // conversão de página = leads ÷ visitas (Meta LPV · Google cliques)
+function convQual(n){ return dv(n.la,n.vis)*100; }                // conv. de página dos qualificados = Lead A ÷ visitas
 
 /* ---------- trend ---------- */
 function trendHTML(cur, prev, higherBetter){
@@ -145,14 +151,14 @@ function renderKpiCol(a, p){
     : '';
   cards+=kpiCard(true,'Leads (formulário)',intf(a.leads),
     subRow('CPL', money(cpl), trendHTML(cpl, dv(p.spend,p.leads), false))
-    + subRow('Conversão de página <small>(clique→lead)</small>', pct(convPag(a)), trendHTML(convPag(a), convPag(p), true))
+    + subRow('Conversão de página <small>('+convLab(channel)+')</small>', pct(convPag(a)), trendHTML(convPag(a), convPag(p), true))
     + originSub);
   // ---- Lead A / B / C (perfil comprador · docs L17-L20) ----
   var cpa=dv(a.spend,a.la), cpaP=dv(p.spend,p.la), qr=a.la+a.lb+a.lc;
   cards+='<div class="kpi-card acard"><div class="kpi-main"><div class="m-lab">Lead A <span class="qtag">o alvo · perseguir</span></div><div class="m-val">'+intf(a.la)+'</div></div>'
     +'<div class="kpi-sub">'
     + subRow('<b>Custo por Lead A</b>', a.la?money(cpa):'—', trendHTML(cpa, cpaP, false))
-    + subRow('Conv. de página qualif. <small>(clique→Lead A)</small>', pct(convQual(a)), trendHTML(convQual(a), convQual(p), true))
+    + subRow('Conv. de página qualif. <small>('+convLab(channel).replace(/lead/g,'Lead A')+')</small>', pct(convQual(a)), trendHTML(convQual(a), convQual(p), true))
     + subRow('Mix A·B·C <small>(quem respondeu)</small>', '<b class="cA">'+intf(a.la)+'</b> · <b class="cB">'+intf(a.lb)+'</b> · <b class="cC">'+intf(a.lc)+'</b> <small>'+(qr?pct(dv(a.la,qr)*100)+' A':'')+'</small>','')
     + '</div></div>';
   el('kpiCol').innerHTML = hero + cards;
@@ -247,7 +253,7 @@ function renderDaily(rng){
   var medCpm=median(rows.map(function(r){return r.impr>0?dv(r.spend,r.impr)*1000:null;}));
   var head='<thead><tr><th>Dia</th><th>Gasto</th><th>Leads</th><th>CPL</th><th>CPM</th><th>CTR</th><th>Conv. pág.</th></tr></thead>';
   var body=rows.map(function(r){
-    var cpl=r.leads>0?dv(r.spend,r.leads):null, cpm=dv(r.spend,r.impr)*1000, ctr=dv(r.clicks,r.impr)*100, cvp=dv(r.leads,r.clicks)*100;
+    var cpl=r.leads>0?dv(r.spend,r.leads):null, cpm=dv(r.spend,r.impr)*1000, ctr=dv(r.clicks,r.impr)*100, cvp=dv(r.leads,r.vis)*100;
     return '<tr><td>'+fmtBR(r.date)+'</td>'
       +'<td class="num"><span class="heatcell" style="'+heatBg('34,211,238',r.spend/maxS)+'">'+money0(r.spend)+'</span></td>'
       +'<td class="num"><span class="heatcell" style="'+heatBg('103,232,249',r.leads/maxL)+'">'+intf(r.leads)+'</span></td>'
@@ -262,8 +268,8 @@ function renderDaily(rng){
 
 /* =================== OTIMIZAÇÃO (árvore inline) =================== */
 function prettyName(x){ return x==='SEM_RASTREIO' ? '— sem rastreio (orgânico) —' : x; }
-function newNode(name,full){ return {name:name,full:full,spend:0,impr:0,reach:0,clicks:0,lpv:0,leads:0,la:0,lb:0,lc:0,kids:{}}; }
-function accum(n,r){ n.spend+=r.spend||0;n.impr+=r.impr||0;n.reach+=r.reach||0;n.clicks+=r.clicks||0;n.lpv+=r.lpv||0;n.leads+=r.leads||0;n.la+=r.la||0;n.lb+=r.lb||0;n.lc+=r.lc||0; }
+function newNode(name,full){ return {name:name,full:full,spend:0,impr:0,reach:0,clicks:0,lpv:0,vis:0,leads:0,la:0,lb:0,lc:0,kids:{}}; }
+function accum(n,r){ n.spend+=r.spend||0;n.impr+=r.impr||0;n.reach+=r.reach||0;n.clicks+=r.clicks||0;n.lpv+=r.lpv||0;n.vis+=r.vis||0;n.leads+=r.leads||0;n.la+=r.la||0;n.lb+=r.lb||0;n.lc+=r.lc||0; }
 var expanded={}, treeInited=false;
 /* ordenação da árvore de otimização (clique no cabeçalho) · dir -1=maior→menor, 1=menor→maior */
 var treeSort={key:'leads',dir:-1};
@@ -277,8 +283,8 @@ function treeMetric(n,key){ switch(key){
   case 'la': return n.la||0; case 'lb': return n.lb||0; case 'lc': return n.lc||0;
   case 'ctr':   return n.impr>0   ? n.clicks/n.impr     : -1;
   case 'cpm':   return n.impr>0   ? n.spend/n.impr*1000 : Infinity;  // sem impr = "infinitamente caro"
-  case 'convp': return n.clicks>0 ? n.leads/n.clicks    : -1;
-  case 'convq': return n.clicks>0 ? n.la/n.clicks       : -1;
+  case 'convp': return n.vis>0 ? n.leads/n.vis    : -1;
+  case 'convq': return n.vis>0 ? n.la/n.vis       : -1;
   case 'cpla':  return n.la>0 ? n.spend/n.la : Infinity;   // sem Lead A = "infinitamente caro"
   case 'cplb':  return n.lb>0 ? n.spend/n.lb : Infinity;
   case 'cpl':   return n.leads>0  ? n.spend/n.leads  : Infinity;
@@ -315,8 +321,8 @@ function metricsCells(n,medA,medB,medC,medL){
   var ctr = n.impr>0?   pct(dv(n.clicks,n.impr)*100)   : '—';
   var cpm = n.impr>0?   money0(dv(n.spend,n.impr)*1000): '—';
   var cpc = n.clicks>0? money(dv(n.spend,n.clicks))    : '—';
-  var cvp = n.clicks>0? pct(dv(n.leads,n.clicks)*100)  : '—';
-  var cvq = n.clicks>0? pct(dv(n.la,n.clicks)*100)     : '—';
+  var cvp = n.vis>0? pct(dv(n.leads,n.vis)*100)  : '—';   // Meta ÷ LPV · Google ÷ clique
+  var cvq = n.vis>0? pct(dv(n.la,n.vis)*100)     : '—';
   return '<td class="num">'+money0(n.spend)+'</td>'
     +'<td class="num">'+intf(n.leads)+'</td>'
     +'<td class="num">'+cpl+'</td>'
@@ -1201,7 +1207,7 @@ function v2Metrics(n){ var q=(n.la||0)+(n.lb||0)+(n.lc||0); return {
   spend:n.spend,impr:n.impr,clicks:n.clicks,lpv:n.lpv,leads:n.leads,la:n.la,lb:n.lb,lc:n.lc,
   cpm:n.impr>0?n.spend/n.impr*1000:null, ctr:n.impr>0?n.clicks/n.impr*100:null, cpc:n.clicks>0?n.spend/n.clicks:null,
   cpl:n.leads>0?n.spend/n.leads:null, cpv:n.lpv>0?n.spend/n.lpv:null, convLP:n.lpv>0?n.leads/n.lpv*100:null,
-  convPag:n.clicks>0?n.leads/n.clicks*100:null, convQual:n.clicks>0?n.la/n.clicks*100:null, cpla:n.la>0?n.spend/n.la:null, pctA:q>0?n.la/q*100:null }; }
+  convPag:n.vis>0?n.leads/n.vis*100:null, convQual:n.vis>0?n.la/n.vis*100:null, cpla:n.la>0?n.spend/n.la:null, pctA:q>0?n.la/q*100:null }; }
 function v2groupBy(rows,level){ var g={};
   rows.forEach(function(r){
     var key = level===0? r.campaign : (level===1? r.campaign+'\u0001'+r.adset : r.campaign+'\u0001'+r.adset+'\u0001'+r.ad);
@@ -1224,7 +1230,7 @@ function v2Kpis(m){
   cards+=kpiCard(false,'Impressões',intf(m.impr), subRow('CPM <small>(custo/mil)</small>',(m.cpm!=null?money(m.cpm):'—'),''));
   cards+=kpiCard(false,'Cliques',intf(m.clicks), subRow('CTR',(m.ctr!=null?pct(m.ctr):'—'),'')+subRow('CPC',(m.cpc!=null?money(m.cpc):'—'),''));
   cards+=kpiCard(false,'Visitas na LP <small>(Meta)</small>',intf(m.lpv), subRow('ConvLP <small>(lead/visita)</small>',(m.convLP!=null?pct(m.convLP):'—'),'')+subRow('CPV',(m.cpv!=null?money(m.cpv):'—'),''));
-  cards+=kpiCard(true,'Leads',intf(m.leads), subRow('<b>CPL</b>',(m.cpl!=null?money(m.cpl):'—'),'')+subRow('Conv. página <small>(clique→lead)</small>',(m.convPag!=null?pct(m.convPag):'—'),''));
+  cards+=kpiCard(true,'Leads',intf(m.leads), subRow('<b>CPL</b>',(m.cpl!=null?money(m.cpl):'—'),'')+subRow('Conv. página <small>('+convLab(v2Channel)+')</small>',(m.convPag!=null?pct(m.convPag):'—'),''));
   cards+='<div class="kpi-card acard"><div class="kpi-main"><div class="m-lab">Lead A <span class="qtag">leadscoring</span></div><div class="m-val">'+intf(m.la)+'</div></div><div class="kpi-sub">'
     +subRow('<b>Custo por Lead A</b>',(m.cpla!=null?money(m.cpla):'—'),'')
     +subRow('% Lead A',(m.pctA!=null?pct(m.pctA):'—'),'')
@@ -1370,17 +1376,18 @@ function mountV2(){
 
 /* =================== VISÃO DAS PÁGINAS (conversão LP→lead por landing page) =================== */
 var pagesChannel='meta';
-// conversão da página = lead ÷ CLIQUE no link — a MESMA régua do Funil ("clique→lead") e da Otimização V2 ("Conv. pág.").
-// NÃO usa LPV: o evento LPV do Meta vem sub-registrado (ex.: L22 LPV2 c/ mais leads que LPV) e inflava a taxa (73% vs 20%).
-function pgConv(p){ return p.clicks>0 ? dv(p.leads,p.clicks)*100 : null; }
-function pgLpvLow(p){ return p.lpv>0 && p.lpv<(p.mLeads||0); }   // LPV (só Meta) menor que os leads DO META = evento sub-registrado
+// conversão da página = leads ÷ VISITAS — padrão da agência: Meta = leads ÷ LPV · Google = leads ÷ cliques (Google não
+// tem LPV). No Geral a base soma LPV do Meta + cliques do Google. É a MESMA régua do Funil, da árvore e da Otimização V2.
+function pgVis(r){ return r.ch==='google' ? (+r.clicks||0) : (+r.lpv||0); }
+function pgConv(p){ return p.vis>0 ? dv(p.leads,p.vis)*100 : null; }
+function pgOver(p){ var c=pgConv(p); return c!=null && c>100; }   // >100% = o Meta registrou menos LPV que leads
 function pgMedal(i){ return i===0?'🥇':(i===1?'🥈':(i===2?'🥉':'')); }
 function pgIsBase(pg){ return pg==='(sem pagina)'; }
 function pgName(pg){ if(pgIsBase(pg)) return 'Base · sem página'; return String(pg).replace(/^\//,''); }
 function pagesDailyChart(pages){
   if(!el('pagesChart')) return;
-  pages.forEach(function(p){ var m={}; p.rows.forEach(function(r){ var o=m[r.date]||(m[r.date]={leads:0,lpv:0,clicks:0}); o.leads+=+r.leads||0;o.lpv+=+r.lpv||0;o.clicks+=+r.clicks||0; }); p.dmap=m; });
-  function convOf(o){ return o.clicks>0?o.leads/o.clicks*100:null; }   // lead ÷ clique (igual pgConv)
+  pages.forEach(function(p){ var m={}; p.rows.forEach(function(r){ var o=m[r.date]||(m[r.date]={leads:0,vis:0}); o.leads+=+r.leads||0; o.vis+=pgVis(r); }); p.dmap=m; });
+  function convOf(o){ return o.vis>0?o.leads/o.vis*100:null; }   // Meta ÷ LPV · Google ÷ clique (igual pgConv)
   var dset={}; pages.forEach(function(p){ Object.keys(p.dmap).forEach(function(d){ if(convOf(p.dmap[d])!=null) dset[d]=1; }); });
   var dates=Object.keys(dset).sort();
   if(!dates.length){ el('pagesChart').innerHTML='<div class="empty">Sem conversão diária no período.</div>'; return; }
@@ -1418,32 +1425,33 @@ function mountPages(){
   el('pagesBar').innerHTML='<span class="pf-h">Período:</span> <span class="v2range">'+fmtBR(rng[0])+' → '+fmtBR(rng[1])+' <small>(ajuste no filtro de data lá em cima)</small></span>'
     +'<span class="pf-h pf-ch">Canal:</span>'+CH.map(function(c){return '<button data-ch="'+c.k+'" class="pbtn'+(pagesChannel===c.k?' on':'')+'">'+c.l+'</button>';}).join('');
   Array.prototype.forEach.call(el('pagesBar').querySelectorAll('.pbtn[data-ch]'),function(b){ b.addEventListener('click',function(){ pagesChannel=b.getAttribute('data-ch'); mountPages(); }); });
-  var pm={}; all.forEach(function(r){ var p=pm[r.page]||(pm[r.page]={page:r.page,leads:0,mLeads:0,mClicks:0,lpv:0,spend:0,clicks:0,la:0,impr:0,rows:[]});
-    p.leads+=+r.leads||0;p.lpv+=+r.lpv||0;p.spend+=+r.spend||0;p.clicks+=+r.clicks||0;p.la+=+r.la||0;p.impr+=+r.impr||0;p.rows.push(r);
-    if(r.ch==='meta'){ p.mLeads+=+r.leads||0; p.mClicks+=+r.clicks||0; } });   // LPV só existe no Meta -> compara c/ leads/cliques do Meta
+  var pm={}; all.forEach(function(r){ var p=pm[r.page]||(pm[r.page]={page:r.page,leads:0,vis:0,lpv:0,spend:0,clicks:0,la:0,impr:0,rows:[]});
+    p.leads+=+r.leads||0;p.vis+=pgVis(r);p.lpv+=+r.lpv||0;p.spend+=+r.spend||0;p.clicks+=+r.clicks||0;p.la+=+r.la||0;p.impr+=+r.impr||0;p.rows.push(r); });
   var list=Object.keys(pm).map(function(k){return pm[k];});
   if(!list.length){ el('pagesKpi').innerHTML=''; el('pagesTbl').innerHTML='<div class="card"><div class="empty">Sem dados de página no período'+(pagesChannel!=='meta'?' (canal '+pagesChannel+')':'')+'.</div></div>'; el('pagesChart').innerHTML=''; return; }
   list.sort(function(a,b){ var ca=pgConv(a),cb=pgConv(b); if(ca==null&&cb==null)return b.leads-a.leads; if(ca==null)return 1; if(cb==null)return -1; return cb-ca || b.leads-a.leads; });
-  var T={leads:0,lpv:0,spend:0,clicks:0,la:0}; list.forEach(function(p){ T.leads+=p.leads;T.lpv+=p.lpv;T.spend+=p.spend;T.clicks+=p.clicks;T.la+=p.la; });
-  var convGeral = T.clicks>0?dv(T.leads,T.clicks)*100:null;
+  var T={leads:0,vis:0,lpv:0,spend:0,clicks:0,la:0}; list.forEach(function(p){ T.leads+=p.leads;T.vis+=p.vis;T.lpv+=p.lpv;T.spend+=p.spend;T.clicks+=p.clicks;T.la+=p.la; });
+  var convGeral = T.vis>0?dv(T.leads,T.vis)*100:null;
+  var visLab = pagesChannel==='google'?'Cliques':(pagesChannel==='meta'?'LPV':'Visitas <small>(LPV Meta + cliques Google)</small>');
   el('pagesKpi').innerHTML='<div class="stat-row">'
-    +'<div class="stat resp"><div class="s-v">'+(convGeral!=null?pct(convGeral):'—')+'</div><div class="s-l">Conversão geral <small>(lead ÷ clique)</small></div></div>'
+    +'<div class="stat resp"><div class="s-v">'+(convGeral!=null?pct(convGeral):'—')+'</div><div class="s-l">Conversão geral <small>('+convLab(pagesChannel)+')</small></div></div>'
     +'<div class="stat"><div class="s-v">'+intf(T.leads)+'</div><div class="s-l">Leads</div></div>'
-    +'<div class="stat"><div class="s-v">'+intf(T.clicks)+'</div><div class="s-l">Cliques no link</div></div>'
+    +'<div class="stat"><div class="s-v">'+intf(T.vis)+'</div><div class="s-l">'+visLab+'</div></div>'
     +'<div class="stat"><div class="s-v">'+money0(T.spend)+'</div><div class="s-l">Gasto</div></div>'
     +'<div class="stat"><div class="s-v">'+(T.leads>0?money(dv(T.spend,T.leads)):'—')+'</div><div class="s-l">CPL médio</div></div></div>';
   var medCpl=median(list.map(function(p){return p.leads>0?p.spend/p.leads:null;}).filter(function(x){return x!=null;}));
-  var head='<thead><tr><th>Página</th><th class="num">Conversão <small>(lead ÷ clique)</small></th><th class="num">Leads</th><th class="num">Cliques</th><th class="num">LPV <small>(Meta)</small></th><th class="num">Gasto</th><th class="num">CPL</th><th class="num">Lead A</th><th class="num">Custo Lead A</th></tr></thead>';
+  var showClk = pagesChannel!=='google';   // no Google a base JÁ é clique (não repete a coluna)
+  var head='<thead><tr><th>Página</th><th class="num">Conversão <small>('+convLab(pagesChannel)+')</small></th><th class="num">Leads</th><th class="num">'+visLab+'</th>'+(showClk?'<th class="num">Cliques</th>':'')+'<th class="num">Gasto</th><th class="num">CPL</th><th class="num">Lead A</th><th class="num">Custo Lead A</th></tr></thead>';
   var realIdx=0;
   var body=list.map(function(p,i){ var base=pgIsBase(p.page), cv=pgConv(p), cpl=p.leads>0?dv(p.spend,p.leads):null, cpla=p.la>0?dv(p.spend,p.la):null, med=base?'':pgMedal(realIdx);
     if(!base) realIdx++;
-    var lpvCell = p.lpv>0 ? (pgLpvLow(p)?'<span class="pg-lpvwarn" title="LPV menor que o nº de leads: o evento de visualização da página do Meta está sub-registrado — por isso a conversão usa cliques">⚠️ '+intf(p.lpv)+'</span>':intf(p.lpv)) : '—';
+    var cvCell = cv==null ? '—' : (pgOver(p) ? '<span class="pg-lpvwarn" title="Acima de 100%: o Meta registrou menos visualizações da página (LPV) do que leads nesta página — o evento de LPV do pixel está sub-registrado">⚠️ '+pct(cv)+'</span>' : pct(cv));
     return '<tr'+(base?' class="pg-baserow"':'')+'>'
       +'<td><span class="pg-name'+(base?' pg-base':'')+'">'+(med?'<span class="pg-medal">'+med+'</span> ':'')+esc(pgName(p.page))+(base?' <span class="pg-basetag">atribuição</span>':'')+'</span></td>'
-      +'<td class="num"><b>'+(cv!=null?pct(cv):'—')+'</b></td>'
+      +'<td class="num"><b>'+cvCell+'</b></td>'
       +'<td class="num">'+intf(p.leads)+'</td>'
-      +'<td class="num">'+intf(p.clicks)+'</td>'
-      +'<td class="num">'+lpvCell+'</td>'
+      +'<td class="num">'+(p.vis>0?intf(p.vis):'—')+'</td>'
+      +(showClk?'<td class="num">'+intf(p.clicks)+'</td>':'')
       +'<td class="num">'+money0(p.spend)+'</td>'
       +'<td class="num">'+(cpl!=null?'<span class="cpl-pill '+relClass(cpl,medCpl)+'">'+money(cpl)+'</span>':'—')+'</td>'
       +'<td class="num"><b class="cA">'+intf(p.la)+'</b></td>'
@@ -1452,11 +1460,11 @@ function mountPages(){
   var note='';
   if(baseP){ var bsh=T.spend>0?Math.round(baseP.spend/T.spend*100):0;
     note='<div class="pg-note">⚠️ <b>Base · sem página</b> = '+money0(baseP.spend)+' ('+bsh+'% do gasto) e '+intf(baseP.clicks)+' cliques em campanhas <b>sem nenhum lead atribuído</b> na planilha — não dá pra amarrar numa landing page. O gasto de anúncios sem lead cujo <i>conjunto/campanha</i> tem leads já é realocado pra página correta.</div>'; }
-  // aviso de LPV sub-registrado (mostra o pior exemplo real) — explica por que a conversão é por clique
-  var worst=null; list.forEach(function(p){ if(pgIsBase(p.page)||!(p.lpv>0)) return; var r=p.mLeads/p.lpv; if(!worst||r>worst.r) worst={p:p,r:r}; });
-  if(worst && worst.r>0.6){ var w=worst.p;
-    note+='<div class="pg-note pg-note-info">ℹ️ <b>Por que lead ÷ clique (e não ÷ LPV)?</b> O evento de visualização da página (LPV) do Meta está <b>sub-registrado</b>: no Meta, <b>'+esc(pgName(w.page))+'</b> tem '+intf(w.mLeads)+' leads p/ só '+intf(w.lpv)+' LPV ('+intf(w.mClicks)+' cliques) — dividir por LPV daria '+pct(worst.r*100)+', irreal. Por isso a conversão aqui é <b>lead ÷ clique</b>, a mesma régua do Funil e da Otimização V2 (os números batem entre as abas). Páginas com ⚠️ no LPV têm menos LPV que leads.</div>'; }
-  el('pagesTbl').innerHTML='<div class="card"><div class="card-h">Ranking de páginas <span class="hint">ordenado por conversão (lead ÷ clique — mesma régua do Funil e da Otimização V2) · 🥇🥈🥉 top 3 páginas · CPL colorido vs mediana</span></div><div class="table-scroll"><table class="tbl v2tbl">'+head+'<tbody>'+body+'</tbody></table></div>'+note+'</div>';
+  // conversão > 100% = o pixel do Meta registrou menos LPV do que leads naquela página (aviso c/ o exemplo real)
+  var over=list.filter(function(p){ return !pgIsBase(p.page) && pgOver(p); });
+  if(over.length){ var w=over.slice().sort(function(a,b){return pgConv(b)-pgConv(a);})[0];
+    note+='<div class="pg-note pg-note-info">ℹ️ <b>Conversão acima de 100%?</b> Acontece quando o Meta registra <b>menos visualizações da página (LPV) do que leads</b> — o evento de LPV do pixel está sub-registrado nessa página (ex.: <b>'+esc(pgName(w.page))+'</b>: '+intf(w.leads)+' leads p/ '+intf(w.vis)+' LPV). Os leads estão certos; a base que vem baixa do Meta. Vale checar o pixel/carregamento dessa LP.</div>'; }
+  el('pagesTbl').innerHTML='<div class="card"><div class="card-h">Ranking de páginas <span class="hint">ordenado por conversão (Meta = lead ÷ LPV · Google = lead ÷ clique — a mesma régua do Funil e da Otimização V2) · 🥇🥈🥉 top 3 páginas · CPL colorido vs mediana</span></div><div class="table-scroll"><table class="tbl v2tbl">'+head+'<tbody>'+body+'</tbody></table></div>'+note+'</div>';
   pagesDailyChart(list.filter(function(p){return pgConv(p)>0;}).slice(0,6));
 }
 
