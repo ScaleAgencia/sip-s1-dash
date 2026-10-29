@@ -40,8 +40,8 @@ $FUNNELS = @(
     queriesId='1C0_WLRrdHDA-QLYc--bQ7D_Zueq-NyVd-idp5uEAQSQ'; metaGid='0'; googleGid='1609119011';
     leadsId='1xrHSoS1bg5O8VL22AFv1FY2xuWHnpHrsY_R3lzXhJ70';   leadsGid='1446265479'
     tagMust='^SIP-L22$'
-    goalSpend=200000; goalDate='2026-11-09'
-    goalSplit=@{ google=0.80; meta=0.20 }   # meta 200k ate 09/11 · divisao 80% Google / 20% Meta
+    goalSpend=240000; goalDate='2026-11-09'   # 29/10: meta subiu de 200k p/ 240k (mesmo prazo)
+    goalSplit=@{ google=0.80; meta=0.20 }   # meta 240k ate 09/11 · divisao 80% Google / 20% Meta
     # meta de LEADS DO TRAFEGO (19/10): 39k leads pagos (utm Google Ads + Facebook Ads) ate 09/11,
     # mantendo 80% Google. start = 1o dia de trafego do L22 (base do "ritmo ideal").
     leadGoal=@{ total=39000; date='2026-11-09'; start='2026-10-07'; google=0.80; meta=0.20 }
