@@ -40,6 +40,8 @@ $FUNNELS = @(
     queriesId='1C0_WLRrdHDA-QLYc--bQ7D_Zueq-NyVd-idp5uEAQSQ'; metaGid='0'; googleGid='1609119011';
     leadsId='1xrHSoS1bg5O8VL22AFv1FY2xuWHnpHrsY_R3lzXhJ70';   leadsGid='1446265479'
     tagMust='^SIP-L22$'
+    # aquecimento/contagem regressiva (etapa E3-AQC) NAO e captacao: fora do gasto/CPL (03/11). Ficam na aba Aquecimento.
+    campExclude='\|\s*E3-AQC\s*\|'
     goalSpend=240000; goalDate='2026-11-09'   # 29/10: meta subiu de 200k p/ 240k (mesmo prazo)
     goalSplit=@{ google=0.80; meta=0.20 }   # meta 240k ate 09/11 · divisao 80% Google / 20% Meta
     # meta de LEADS DO TRAFEGO (19/10): 39k leads pagos (utm Google Ads + Facebook Ads) ate 09/11,
@@ -381,6 +383,20 @@ function Build-Funnel($cfg){
     if($L_MAIL -lt 0 -or $L_UCAMP -lt 0){ $leadsOk=$false; Write-Host ("AVISO: [$name] leads sem colunas esperadas (email/utm_campaign) -> funil sem leads") }
   }
 
+  # ---- campanhas FORA da captacao (ex.: L22 aquecimento/contagem regressiva "E3-AQC"): somem do gasto,
+  #      CPL, metas, arvore, V2 e paginas. Ficam so na aba Aquecimento (via MCP). Regex por funil em campExclude.
+  $campEx = if($cfg.Contains('campExclude') -and $cfg.campExclude){ [string]$cfg.campExclude } else { '' }
+  if($campEx -ne ''){
+    $exM=@($qd  | Where-Object { $_.Count -gt $Q_CAMP -and (Norm $_[$Q_CAMP]) -match $campEx })
+    $exG=@($qgd | Where-Object { $_.Count -gt $G_CAMP -and (Norm $_[$G_CAMP]) -match $campEx })
+    if($exM.Count -or $exG.Count){
+      $exSp=0.0; foreach($r in $exM){ $exSp+=(MoneyBR (Cell $r $Q_SPEND))*$TAX }; foreach($r in $exG){ $exSp+=(MoneyBR (Cell $r $G_SPEND))*$TAXG }
+      $exNames=@(@($exM | ForEach-Object { Norm $_[$Q_CAMP] }) + @($exG | ForEach-Object { Norm $_[$G_CAMP] }) | Sort-Object -Unique)
+      Write-Host ("  [$name] fora da captacao (campExclude '{0}'): {1} campanha(s), {2} linha(s), R$ {3:N2} c/ imposto" -f $campEx,$exNames.Count,($exM.Count+$exG.Count),$exSp)
+    }
+    $qd  = @($qd  | Where-Object { -not ($_.Count -gt $Q_CAMP -and (Norm $_[$Q_CAMP]) -match $campEx) })
+    $qgd = @($qgd | Where-Object { -not ($_.Count -gt $G_CAMP -and (Norm $_[$G_CAMP]) -match $campEx) })
+  }
   # ---- mapas de atribuicao por canal ----
   $MS = BuildSets $qd  $Q_CAMP $Q_SET $Q_AD    # Meta
   $GS = BuildSets $qgd $G_CAMP $G_SET $G_AD    # Google

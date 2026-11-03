@@ -1641,13 +1641,13 @@ function mountAquecL22(w){
   var S={spend:0,reach:0,impr:0,link:0};
   camps.forEach(function(c){ var t=c.total||{}; S.spend+=+t.spend||0; S.reach+=+t.reach||0; S.impr+=+t.impr||0; S.link+=+t.linkClicks||0; });
   function st(v,l,sub){ return '<div class="stat"><div class="s-v">'+v+'</div><div class="s-l">'+l+'</div>'+(sub?'<div class="aq-sub">'+sub+'</div>':'')+'</div>'; }
-  var head='<div class="card"><div class="card-h">🔥 Aquecimento · L22 <span class="hint">'+esc(A.account)+' · '+camps.length+' campanhas · puxado via MCP do Meta Ads · snapshot '+esc(A.updatedAt||'')+'</span></div>'
+  var head='<div class="card"><div class="card-h">🔥 Aquecimento · L22 <span class="hint">'+esc(A.account)+' · '+camps.length+' campanhas · puxado via MCP do Meta Ads · snapshot '+esc(A.updatedAt||'')+' · fora do gasto de captação</span></div>'
     +'<div class="stat-row aq-stats">'
       +st(money(S.spend),'Gasto total <small>(sem imposto)</small>', money(S.spend*TX)+' com imposto')
-      +st(intf(S.reach),'Alcance somado','soma das 2 campanhas (pode ter a mesma pessoa nas duas)')
+      +st(intf(S.reach),'Alcance somado','soma das '+camps.length+' campanhas (a mesma pessoa pode estar em mais de uma)')
       +st(intf(S.impr),'Impressões','frequência média '+f2(S.reach?S.impr/S.reach:0))
       +st(money(S.impr?S.spend/S.impr*1000:0),'CPM médio','custo por mil impressões')
-      +st(intf(S.link),'Cliques no link','vêm da contagem regressiva')
+      +st(intf(S.link),'Cliques no link','das campanhas de tráfego')
     +'</div></div>';
   var cards=camps.map(function(c){ var t=c.total||{}, traf=/tr[aá]fego/i.test(c.objective||''), cpp=t.reach?t.spend/t.reach*1000:0;
     var kp=[['Gasto',money(t.spend)],['Alcance',intf(t.reach)],['Frequência',f2(t.freq)],['Impressões',intf(t.impr)],['CPM',money(t.cpm)],['Custo / mil alcançadas',money(cpp)]];

@@ -42,27 +42,35 @@ window.AQUECIMENTO = {
 /* ===== L22 · Aquecimento + Contagem regressiva (add 03/11/2026) =====
    Puxado via MCP do Meta Ads — conta CA05 - Alberto Pompeu (764177629712794). NÃO tem planilha:
    snapshot manual, não atualiza no refresh automático. Gasto = valor do gerenciador (SEM imposto).
-   Alcance do período é ÚNICO por campanha (não é a soma do alcance diário). 03/11 = dia parcial. */
+   Alcance do período é ÚNICO por campanha (não é a soma do alcance diário). Dia de hoje = parcial.
+   Estas campanhas (etapa E3-AQC) ficam FORA do gasto de captação do L22 (campExclude no build). */
 window.AQUECIMENTO_L22 = {
   account: "CA05 - Alberto Pompeu",
   accountId: "764177629712794",
-  updatedAt: "03/11/2026 09:30",
+  updatedAt: "03/11/2026 14:41",
   camps: [
     { key:"contagem", short:"Contagem regressiva", id:"120250057276700318",
       name:"SIP-L22 | E3-AQC | IG | P1-RMKT | ALC | ABO | 2026-11-02 | Contagem regressiva",
       objective:"Tráfego", status:"ACTIVE", start:"2026-11-02",
-      total:{ spend:274.36, reach:10209, freq:1.956607, impr:19975, clicks:323, linkClicks:296, cpm:13.74, cpc:0.85, ctr:1.62 },
+      total:{ spend:385.87, reach:11935, freq:2.286804, impr:27293, clicks:425, linkClicks:398, cpm:14.14, cpc:0.91, ctr:1.56 },
       rows:[
-        { date:"2026-11-02", spend:197.10, reach:8660, freq:1.62552,  impr:14077, clicks:237, linkClicks:219, cpm:14.00, cpp:22.76, cpc:0.83, ctr:1.68 },
-        { date:"2026-11-03", spend:77.26,  reach:3767, freq:1.565702, impr:5898,  clicks:86,  linkClicks:77,  cpm:13.10, cpp:20.51, cpc:0.90, ctr:1.46 }
+        { date:"2026-11-02", spend:197.17, reach:8662, freq:1.628954, impr:14110, clicks:237, linkClicks:219, cpm:13.97, cpp:22.76, cpc:0.83, ctr:1.68 },
+        { date:"2026-11-03", spend:188.70, reach:6907, freq:1.908643, impr:13183, clicks:188, linkClicks:179, cpm:14.31, cpp:27.32, cpc:1.00, ctr:1.43 }
       ] },
-    { key:"aquecimento", short:"Aquecimento", id:"120250056991040318",
+    { key:"aquecimento", short:"Aquecimento · Alcance", id:"120250056991040318",
       name:"SIP-L22 | E3-AQC | IG | P1-RMKT | ALCANCE | ABO | 2026-11- 02 | Aquecimento",
       objective:"Reconhecimento (alcance)", status:"ACTIVE", start:"2026-11-02", dailyBudget:200,
-      total:{ spend:126.25, reach:24748, freq:1.133182, impr:28044, clicks:28, linkClicks:0, cpm:4.50, cpc:4.51, ctr:0.0998 },
+      total:{ spend:238.41, reach:27561, freq:1.649759, impr:45469, clicks:47, linkClicks:1, cpm:5.24, cpc:5.07, ctr:0.10 },
       rows:[
-        { date:"2026-11-02", spend:75.60, reach:19221, freq:1.102752, impr:21196, clicks:17, linkClicks:0, cpm:3.57, cpp:3.93, cpc:4.45, ctr:0.0802 },
-        { date:"2026-11-03", spend:50.65, reach:6134,  freq:1.1164,   impr:6848,  clicks:11, linkClicks:0, cpm:7.40, cpp:8.26, cpc:4.60, ctr:0.16 }
+        { date:"2026-11-02", spend:75.66,  reach:19224, freq:1.103881, impr:21221, clicks:17, linkClicks:0, cpm:3.57, cpp:3.94, cpc:4.45, ctr:0.0801 },
+        { date:"2026-11-03", spend:162.75, reach:19569, freq:1.239103, impr:24248, clicks:30, linkClicks:1, cpm:6.71, cpp:8.32, cpc:5.43, ctr:0.12 }
+      ] },
+    { key:"aquec-trafego", short:"Aquecimento · Tráfego (ad024)", id:"120250079453070318",
+      name:"SIP-L22 | E3-AQC | IG | P1-RMKT | TRÁFEGO | ABO | 2026-11- 03 | Aquecimento | ad024",
+      objective:"Tráfego", status:"ACTIVE", start:"2026-11-03", dailyBudget:500,
+      total:{ spend:42.39, reach:1380, freq:1.328986, impr:1834, clicks:26, linkClicks:20, cpm:23.11, cpc:1.63, ctr:1.42 },
+      rows:[
+        { date:"2026-11-03", spend:42.39, reach:1380, freq:1.328986, impr:1834, clicks:26, linkClicks:20, cpm:23.11, cpp:30.72, cpc:1.63, ctr:1.42 }
       ] }
   ]
 };
