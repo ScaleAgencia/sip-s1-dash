@@ -38,3 +38,31 @@ window.AQUECIMENTO = {
     { date:"2026-09-13", reach:13159, freq:2.579983, impr:33950, clicks:899,  spend:1168.97, cpm:34.43, cpc:1.30, ctr:2.65 }
   ]
 };
+
+/* ===== L22 · Aquecimento + Contagem regressiva (add 03/11/2026) =====
+   Puxado via MCP do Meta Ads — conta CA05 - Alberto Pompeu (764177629712794). NÃO tem planilha:
+   snapshot manual, não atualiza no refresh automático. Gasto = valor do gerenciador (SEM imposto).
+   Alcance do período é ÚNICO por campanha (não é a soma do alcance diário). 03/11 = dia parcial. */
+window.AQUECIMENTO_L22 = {
+  account: "CA05 - Alberto Pompeu",
+  accountId: "764177629712794",
+  updatedAt: "03/11/2026 09:30",
+  camps: [
+    { key:"contagem", short:"Contagem regressiva", id:"120250057276700318",
+      name:"SIP-L22 | E3-AQC | IG | P1-RMKT | ALC | ABO | 2026-11-02 | Contagem regressiva",
+      objective:"Tráfego", status:"ACTIVE", start:"2026-11-02",
+      total:{ spend:274.36, reach:10209, freq:1.956607, impr:19975, clicks:323, linkClicks:296, cpm:13.74, cpc:0.85, ctr:1.62 },
+      rows:[
+        { date:"2026-11-02", spend:197.10, reach:8660, freq:1.62552,  impr:14077, clicks:237, linkClicks:219, cpm:14.00, cpp:22.76, cpc:0.83, ctr:1.68 },
+        { date:"2026-11-03", spend:77.26,  reach:3767, freq:1.565702, impr:5898,  clicks:86,  linkClicks:77,  cpm:13.10, cpp:20.51, cpc:0.90, ctr:1.46 }
+      ] },
+    { key:"aquecimento", short:"Aquecimento", id:"120250056991040318",
+      name:"SIP-L22 | E3-AQC | IG | P1-RMKT | ALCANCE | ABO | 2026-11- 02 | Aquecimento",
+      objective:"Reconhecimento (alcance)", status:"ACTIVE", start:"2026-11-02", dailyBudget:200,
+      total:{ spend:126.25, reach:24748, freq:1.133182, impr:28044, clicks:28, linkClicks:0, cpm:4.50, cpc:4.51, ctr:0.0998 },
+      rows:[
+        { date:"2026-11-02", spend:75.60, reach:19221, freq:1.102752, impr:21196, clicks:17, linkClicks:0, cpm:3.57, cpp:3.93, cpc:4.45, ctr:0.0802 },
+        { date:"2026-11-03", spend:50.65, reach:6134,  freq:1.1164,   impr:6848,  clicks:11, linkClicks:0, cpm:7.40, cpp:8.26, cpc:4.60, ctr:0.16 }
+      ] }
+  ]
+};

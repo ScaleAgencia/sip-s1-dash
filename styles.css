@@ -551,3 +551,24 @@ tr.lg-part td{background:rgba(128,147,179,.07)} tr.lg-part small{color:var(--mut
 .lg-status.near{background:rgba(250,204,21,.07);border-color:rgba(250,204,21,.35);color:#f7ecb5}
 .pg-note.pg-note-info{background:rgba(34,211,238,.06);border-color:rgba(34,211,238,.25)}
 .pg-lpvwarn{color:#f5b041;cursor:help}
+
+/* ---- Aquecimento L22 (2 campanhas via MCP) ---- */
+.aq-stats{grid-template-columns:repeat(5,1fr)}
+@media(max-width:900px){.aq-stats{grid-template-columns:1fr 1fr}}
+.aq-sub{font-size:11px;color:var(--muted2);margin-top:4px;line-height:1.35}
+.aq-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:1000px){.aq-grid{grid-template-columns:1fr}}
+.aq-camp-card{margin:0;min-width:0}
+.aq-grid>*{min-width:0}
+.aq-camp-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.aq-camp-name{font-size:17px;font-weight:700;color:var(--ink)}
+.aq-camp-full{font-size:11px;color:var(--muted2);margin-top:3px;word-break:break-word}
+.aq-badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.aq-badge{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.aq-badge.obj{color:#f5b041;background:rgba(245,176,65,.13)}
+.aq-badge.on{color:#34d399;background:rgba(52,211,153,.13)}
+.aq-badge.off{color:var(--muted);background:var(--panel3)}
+.aq-meta{font-size:11.5px;color:var(--muted);margin:8px 0 12px}
+.aq-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.aq-kpi{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.aq-kpi .v{font-size:15px;font-weight:700;color:var(--ink)} .aq-kpi .l{font-size:10.5px;color:var(--muted2);text-transform:uppercase;letter-spacing:.3px;margin-top:2px}

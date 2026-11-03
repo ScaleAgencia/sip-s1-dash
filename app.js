@@ -1632,8 +1632,47 @@ function renderAll(){ var rng=rangeFor(period), a=aggDaily(rng), p=aggDaily(prev
   var hc=el('hotColdCard'); if(hc) hc.style.display=(funKey==='l21'||funKey==='l22')?'':'none'; }
 var TABS=['funil','micro','v2','pages','leads','perfil','acomp','qualidade','aquec','engaje'];
 /* ---- Aquecimento (L21) · dados via MCP do Meta Ads (snapshot em aquecimento.js) ---- */
+/* Aquecimento do L22 — 2 campanhas (Contagem regressiva + Aquecimento) via MCP do Meta (window.AQUECIMENTO_L22). */
+function mountAquecL22(w){
+  var A=window.AQUECIMENTO_L22, camps=A?arr(A.camps):[];
+  if(!camps.length){ w.innerHTML='<div class="card"><div class="empty">Sem dados das campanhas de aquecimento do L22.</div></div>'; return; }
+  var TX=+D.taxMultiplier||1.1385, tISO=todayISO();
+  var f2=function(x){ return (Math.round((x||0)*100)/100).toFixed(2).replace('.',','); };
+  var S={spend:0,reach:0,impr:0,link:0};
+  camps.forEach(function(c){ var t=c.total||{}; S.spend+=+t.spend||0; S.reach+=+t.reach||0; S.impr+=+t.impr||0; S.link+=+t.linkClicks||0; });
+  function st(v,l,sub){ return '<div class="stat"><div class="s-v">'+v+'</div><div class="s-l">'+l+'</div>'+(sub?'<div class="aq-sub">'+sub+'</div>':'')+'</div>'; }
+  var head='<div class="card"><div class="card-h">🔥 Aquecimento · L22 <span class="hint">'+esc(A.account)+' · '+camps.length+' campanhas · puxado via MCP do Meta Ads · snapshot '+esc(A.updatedAt||'')+'</span></div>'
+    +'<div class="stat-row aq-stats">'
+      +st(money(S.spend),'Gasto total <small>(sem imposto)</small>', money(S.spend*TX)+' com imposto')
+      +st(intf(S.reach),'Alcance somado','soma das 2 campanhas (pode ter a mesma pessoa nas duas)')
+      +st(intf(S.impr),'Impressões','frequência média '+f2(S.reach?S.impr/S.reach:0))
+      +st(money(S.impr?S.spend/S.impr*1000:0),'CPM médio','custo por mil impressões')
+      +st(intf(S.link),'Cliques no link','vêm da contagem regressiva')
+    +'</div></div>';
+  var cards=camps.map(function(c){ var t=c.total||{}, traf=/tr[aá]fego/i.test(c.objective||''), cpp=t.reach?t.spend/t.reach*1000:0;
+    var kp=[['Gasto',money(t.spend)],['Alcance',intf(t.reach)],['Frequência',f2(t.freq)],['Impressões',intf(t.impr)],['CPM',money(t.cpm)],['Custo / mil alcançadas',money(cpp)]];
+    if(traf) kp.push(['Cliques no link',intf(t.linkClicks)],['Custo por clique no link',t.linkClicks?money(t.spend/t.linkClicks):'—'],['CTR',f2(t.ctr)+'%']);
+    else kp.push(['Cliques',intf(t.clicks)],['CTR',f2(t.ctr)+'%']);
+    var rows=arr(c.rows).slice().sort(function(a,b){return b.date.localeCompare(a.date);}).map(function(r){ var part=r.date===tISO;
+      return '<tr'+(part?' class="lg-part"':'')+'><td>'+fmtBR(r.date)+(part?' <small>hoje · parcial</small>':'')+'</td><td class="num">'+money(r.spend)+'</td><td class="num">'+intf(r.reach)+'</td><td class="num">'+f2(r.freq)+'</td><td class="num">'+intf(r.impr)+'</td>'
+        +'<td class="num">'+money(r.cpm)+'</td><td class="num">'+money(r.cpp)+'</td>'
+        +(traf?'<td class="num">'+intf(r.linkClicks)+'</td><td class="num">'+(r.linkClicks?money(r.spend/r.linkClicks):'—')+'</td>':'<td class="num">'+intf(r.clicks)+'</td>')
+        +'<td class="num">'+f2(r.ctr)+'%</td></tr>'; }).join('');
+    var th='<thead><tr><th>Dia</th><th class="num">Gasto</th><th class="num">Alcance</th><th class="num">Freq.</th><th class="num">Impr.</th><th class="num">CPM</th><th class="num">Custo/mil alc.</th>'
+      +(traf?'<th class="num">Cliques link</th><th class="num">CPC link</th>':'<th class="num">Cliques</th>')+'<th class="num">CTR</th></tr></thead>';
+    return '<div class="card aq-camp-card"><div class="aq-camp-top"><div><div class="aq-camp-name">'+esc(c.short||c.name)+'</div><div class="aq-camp-full">'+esc(c.name)+'</div></div>'
+        +'<div class="aq-badges"><span class="aq-badge obj">'+esc(c.objective||'')+'</span><span class="aq-badge '+(c.status==='ACTIVE'?'on':'off')+'">'+(c.status==='ACTIVE'?'● ativa':esc(c.status||''))+'</span></div></div>'
+      +'<div class="aq-meta">desde '+fmtBR(c.start||'')+(c.dailyBudget?' · orçamento R$ '+nf0.format(c.dailyBudget)+'/dia':'')+' · ID '+esc(c.id||'')+'</div>'
+      +'<div class="aq-kpis">'+kp.map(function(k){ return '<div class="aq-kpi"><div class="v">'+k[1]+'</div><div class="l">'+k[0]+'</div></div>'; }).join('')+'</div>'
+      +'<div class="table-scroll"><table class="tbl">'+th+'<tbody>'+rows+'</tbody></table></div></div>'; }).join('');
+  var note='<div class="aquec-note"><small><b>Como ler:</b> o alcance de cada campanha no período conta cada pessoa uma vez só, por isso é menor que a soma do alcance dos dias. '
+    +'O gasto é o valor do gerenciador (sem imposto) e o dia de hoje é parcial. '
+    +'Essas campanhas não têm planilha: os dados vêm do Meta via MCP e <b>não atualizam no refresh automático</b>. É só pedir que eu puxo de novo.</small></div>';
+  w.innerHTML=head+'<div class="aq-grid">'+cards+'</div>'+note;
+}
 function mountAquec(){
   var w=el('aquecWrap'); if(!w) return;
+  if(funKey==='l22'){ mountAquecL22(w); return; }
   var A=window.AQUECIMENTO;
   if(!A || !A.rows || !A.rows.length){ w.innerHTML='<div class="card"><div class="empty">Sem dados da campanha de aquecimento.</div></div>'; return; }
   var tSpend=0,tImpr=0,tClicks=0;
