@@ -362,7 +362,9 @@ function Build-Funnel($cfg){
   $Q_IMP=HdrLike $qh 'impressions'
   $Q_REACH=HdrLike $qh 'reach'; if($Q_REACH -lt 0){ $Q_REACH=HdrLike $qh '*reach*' }   # opcional (formato novo nao tem)
   $Q_CLK=HdrLike $qh 'link clicks'; if($Q_CLK -lt 0){ $Q_CLK=HdrLike $qh '*link clicks*' }
-  $Q_LPV=HdrLike $qh 'landing page views'; if($Q_LPV -lt 0){ $Q_LPV=HdrLike $qh '*landing page view*' }
+  # 1o Action Landing Page View (formato novo): quando o formato novo (9 colunas) escreve por cima do antigo (10),
+  # sobra uma coluna J "Landing Page Views" VELHA e DESALINHADA das linhas (05/11: 3.103 LPV num anuncio c/ 21 cliques).
+  $Q_LPV=HdrLike $qh '*action landing page view*'; if($Q_LPV -lt 0){ $Q_LPV=HdrLike $qh 'landing page views' }; if($Q_LPV -lt 0){ $Q_LPV=HdrLike $qh '*landing page view*' }
   $Q_ML=HdrLike $qh 'leads'                                       # opcional: leads do pixel (formato novo nao tem)
   foreach($pat in 'action lead','action leads','action omni lead*','action *lead*'){ if($Q_ML -lt 0){ $Q_ML=HdrLike $qh $pat } }   # se adicionarem no formato novo
   foreach($pair in @(@('Day/Date',$Q_DAY),@('Campaign',$Q_CAMP),@('Ad Set/Adset',$Q_SET),@('Ad Name',$Q_AD),@('Amount Spent/Spend',$Q_SPEND),@('Impressions',$Q_IMP),@('Link Clicks',$Q_CLK))){
