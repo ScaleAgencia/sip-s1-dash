@@ -39,7 +39,8 @@ $FUNNELS = @(
   [ordered]@{ key='l22'; label='SIP-L22';
     queriesId='1C0_WLRrdHDA-QLYc--bQ7D_Zueq-NyVd-idp5uEAQSQ'; metaGid='0'; googleGid='1609119011';
     leadsId='1xrHSoS1bg5O8VL22AFv1FY2xuWHnpHrsY_R3lzXhJ70';   leadsGid='1446265479'
-    tagMust='^SIP-L22$'
+    # 10/11: leads novos chegam com tag SIP-L22-2 (lista atualizada pelo usuario) -> aceita SIP-L22 e SIP-L22-N
+    tagMust='^SIP-L22(-\d+)?$'
     # aquecimento/contagem regressiva (etapa E3-AQC) NAO e captacao: fora do gasto/CPL (03/11). Ficam na aba Aquecimento.
     campExclude='\|\s*E3-AQC\s*\|'
     goalSpend=240000; goalDate='2026-11-09'   # 29/10: meta subiu de 200k p/ 240k (mesmo prazo)
