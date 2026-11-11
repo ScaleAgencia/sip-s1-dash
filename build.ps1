@@ -39,8 +39,10 @@ $FUNNELS = @(
   [ordered]@{ key='l22'; label='SIP-L22';
     queriesId='1C0_WLRrdHDA-QLYc--bQ7D_Zueq-NyVd-idp5uEAQSQ'; metaGid='0'; googleGid='1609119011';
     leadsId='1xrHSoS1bg5O8VL22AFv1FY2xuWHnpHrsY_R3lzXhJ70';   leadsGid='1446265479'
-    # 10/11: leads novos chegam com tag SIP-L22-2 (lista atualizada pelo usuario) -> aceita SIP-L22 e SIP-L22-N
-    tagMust='^SIP-L22(-\d+)?$'
+    # 11/11: SIP-L22-2 virou funil proprio (l22b) -> aqui so a tag SIP-L22. O gasto das campanhas
+    # compartilhadas e dividido por dia x canal pela fatia de leads pagos de cada tag (splitFamily/splitFrom).
+    tagMust='^SIP-L22$'
+    splitFamily='^SIP-L22(-\d+)?$'; splitFrom='2026-11-09'
     # aquecimento/contagem regressiva (etapa E3-AQC) NAO e captacao: fora do gasto/CPL (03/11). Ficam na aba Aquecimento.
     campExclude='\|\s*E3-AQC\s*\|'
     goalSpend=240000; goalDate='2026-11-09'   # 29/10: meta subiu de 200k p/ 240k (mesmo prazo)
@@ -57,6 +59,17 @@ $FUNNELS = @(
       [ordered]@{ key='alunos';    label='Alunos';        goal=5000 }
       [ordered]@{ key='antigos';   label='Leads antigos'; goal=5000 }
     ) }
+  # 11/11: 2a leva do L22 (tag SIP-L22-2, desde 09/11). MESMAS planilhas do L22; separa por tag do lead
+  # e corta as queries antes de dateFrom. No dia da virada (09/11) o gasto e dividido com o L22 pela
+  # fatia de leads pagos de cada tag (splitFamily/splitFrom) -> L22 + L22-2 = gasto total, sem contar 2x.
+  [ordered]@{ key='l22b'; label='SIP-L22-2';
+    queriesId='1C0_WLRrdHDA-QLYc--bQ7D_Zueq-NyVd-idp5uEAQSQ'; metaGid='0'; googleGid='1609119011';
+    leadsId='1xrHSoS1bg5O8VL22AFv1FY2xuWHnpHrsY_R3lzXhJ70';   leadsGid='1446265479'
+    tagMust='^SIP-L22-2$'
+    dateFrom='2026-11-09'
+    splitFamily='^SIP-L22(-\d+)?$'; splitFrom='2026-11-09'
+    campExclude='\|\s*E3-AQC\s*\|'
+    goalSpend=0; goalDate='' }
 )
 $TAX  = 1.1385          # imposto Meta (+13,85%) aplicado no gasto do Meta
 $TAXG = 1.0             # Google Ads NAO tem imposto
@@ -403,6 +416,50 @@ function Build-Funnel($cfg){
   # ---- mapas de atribuicao por canal ----
   $MS = BuildSets $qd  $Q_CAMP $Q_SET $Q_AD    # Meta
   $GS = BuildSets $qgd $G_CAMP $G_SET $G_AD    # Google
+  # ---- corte de data (funil que nasce no meio de outro, ex.: SIP-L22-2 desde 09/11): linhas de anuncio,
+  #      pesquisa e grupos ANTES de dateFrom ficam de fora. Corta DEPOIS do BuildSets p/ a atribuicao ser
+  #      identica a do funil irmao (senao a fatia do dia da virada nao soma 100% entre os dois). ----
+  $dateFrom = if($cfg.Contains('dateFrom') -and $cfg.dateFrom){ [string]$cfg.dateFrom } else { '' }
+  if($dateFrom -ne ''){
+    $qd  = @($qd  | Where-Object { $_.Count -gt $Q_DAY -and (Norm $_[$Q_DAY]) -ge $dateFrom })
+    $qgd = @($qgd | Where-Object { $G_DAY -ge 0 -and $_.Count -gt $G_DAY -and (Norm $_[$G_DAY]) -ge $dateFrom })
+    Write-Host ("  [$name] queries a partir de {0}: {1} linha(s) Meta, {2} linha(s) Google" -f $dateFrom,$qd.Count,$qgd.Count)
+  }
+
+  # ---- DIVISAO DO GASTO ENTRE TAGS IRMAS (splitFamily + splitFrom; add 11/11 p/ SIP-L22 x SIP-L22-2) ----
+  # As MESMAS campanhas alimentam 2 funis. A partir de splitFrom, cada linha de anuncio (gasto/impr/cliques/LPV)
+  # do dia D no canal C vale a FATIA dos leads PAGOS atribuidos em D/C (so tags da familia) que tem a tag
+  # deste funil. Dia/canal sem lead pago da familia herda a fatia do dia anterior; sem nenhum dado ainda = 100%.
+  $splitFam  = if($cfg.Contains('splitFamily') -and $cfg.splitFamily){ [string]$cfg.splitFamily } else { '' }
+  $splitFrom = if($cfg.Contains('splitFrom') -and $cfg.splitFrom){ [string]$cfg.splitFrom } else { '' }
+  $shareOf=@{}   # "canal|data" -> fatia 0..1 (so datas >= splitFrom)
+  if($splitFam -ne '' -and $splitFrom -ne '' -and $leadsOk -and $L_TAG -ge 0){
+    $tagOwn = if($cfg.Contains('tagMust') -and $cfg.tagMust){ [string]$cfg.tagMust } else { '' }
+    $shareCnt=@{}   # "canal|data" -> @(leads pagos c/ a tag deste funil, leads pagos da familia)
+    foreach($r in $ld){
+      if($null -eq $r -or $r.Count -le $L_UCAMP -or $r.Count -le $L_TAG){ continue }
+      $stg=Norm $r[$L_TAG]; if($stg -eq '' -or $stg -notmatch $splitFam){ continue }
+      $sd=LeadDate $r[$L_DATE]; if($sd -eq '' -and $L_CREATED -ge 0){ $sd=IsoDate $r[$L_CREATED] }
+      if($sd -eq '' -or $sd -lt $splitFrom){ continue }
+      $smail=Norm $r[$L_MAIL]; $ssrc=Norm $r[$L_USRC]; $smed=Norm $r[$L_UMED]
+      if($smail -eq '' -or (IsTest $smail $ssrc $smed)){ continue }
+      $scamp=Norm $r[$L_UCAMP]; $scont=Norm $r[$L_UCONT]; $sterm=Norm $r[$L_UTERM]
+      $spl=''; if($null -ne (Attribute $scamp $scont $sterm $MS)){ $spl='meta' } elseif($null -ne (Attribute $scamp $scont $sterm $GS)){ $spl='google' }
+      if($spl -eq ''){ continue }
+      $sk="$spl|$sd"; if(-not $shareCnt.ContainsKey($sk)){ $shareCnt[$sk]=@(0,0) }
+      $shareCnt[$sk][1]++; if($tagOwn -eq '' -or $stg -match $tagOwn){ $shareCnt[$sk][0]++ }
+    }
+    $sDates=@{}
+    foreach($r in $qd){ if($r.Count -gt $Q_DAY){ $x=Norm $r[$Q_DAY]; if($x -match '^\d{4}-\d{2}-\d{2}$' -and $x -ge $splitFrom){ $sDates[$x]=1 } } }
+    if($G_DAY -ge 0){ foreach($r in $qgd){ if($r.Count -gt $G_DAY){ $x=Norm $r[$G_DAY]; if($x -match '^\d{4}-\d{2}-\d{2}$' -and $x -ge $splitFrom){ $sDates[$x]=1 } } } }
+    foreach($sk in $shareCnt.Keys){ $sDates[($sk -split '\|')[1]]=1 }
+    foreach($spl in @('meta','google')){ $slast=$null
+      foreach($x in @($sDates.Keys | Sort-Object)){ $sk="$spl|$x"
+        if($shareCnt.ContainsKey($sk) -and $shareCnt[$sk][1] -gt 0){ $slast=[double]$shareCnt[$sk][0]/$shareCnt[$sk][1] }
+        $shareOf[$sk] = $(if($null -ne $slast){ $slast } else { 1.0 })
+        $sc = if($shareCnt.ContainsKey($sk)){ "{0} de {1} leads pagos" -f $shareCnt[$sk][0],$shareCnt[$sk][1] } else { 'sem lead pago -> herda' }
+        Write-Host ("  [$name] fatia do gasto {0} {1}: {2:P1} ({3})" -f $spl,$x,$shareOf[$sk],$sc) } }
+  }
 
   # ---- estado local (mutado por GetDay/GetGrain via escopo dinamico) ----
   $daily=@{}; $grain=@{}
@@ -412,6 +469,8 @@ function Build-Funnel($cfg){
   foreach($r in $qd){ if($null -eq $r -or $r.Count -le $Q_DAY){continue}; $d=Norm $r[$Q_DAY]; if($d -notmatch '^\d{4}-\d{2}-\d{2}$'){continue}
     if($shift.ContainsKey($d)){ $d=[string]$shift[$d] }
     $sp=(MoneyBR (Cell $r $Q_SPEND))*$TAX; $im=ToInt (Cell $r $Q_IMP); $rc=ToInt (Cell $r $Q_REACH); $ck=ToInt (Cell $r $Q_CLK); $lp=ToInt (Cell $r $Q_LPV); $ml=ToInt (Cell $r $Q_ML)
+    if($shareOf.ContainsKey("meta|$d")){ $mul=[double]$shareOf["meta|$d"]; if($mul -le 0){ continue }
+      if($mul -lt 1){ $sp*=$mul; $im=[int][math]::Round($im*$mul); $rc=[int][math]::Round($rc*$mul); $ck=[int][math]::Round($ck*$mul); $lp=[int][math]::Round($lp*$mul); $ml=[int][math]::Round($ml*$mul) } }
     $o=GetDay 'meta' $d; $o.spend+=$sp;$o.impr+=$im;$o.reach+=$rc;$o.clicks+=$ck;$o.lpv+=$lp;$o.platLeads+=$ml
     $g=GetGrain 'meta' $d (Norm $r[$Q_CAMP]) (Norm (Cell $r $Q_SET)) (Norm (Cell $r $Q_AD))
     $g.spend+=$sp;$g.impr+=$im;$g.reach+=$rc;$g.clicks+=$ck;$g.lpv+=$lp;$g.platLeads+=$ml }
@@ -421,6 +480,8 @@ function Build-Funnel($cfg){
     $d=Norm $r[$G_DAY]; if($d -notmatch '^\d{4}-\d{2}-\d{2}$'){continue}
     if($shift.ContainsKey($d)){ $d=[string]$shift[$d] }
     $sp=(MoneyBR (Cell $r $G_SPEND))*$TAXG; $im=ToInt (Cell $r $G_IMP); $ck=ToInt (Cell $r $G_CLK); $cv=ToInt (Cell $r $G_CONV)
+    if($shareOf.ContainsKey("google|$d")){ $mul=[double]$shareOf["google|$d"]; if($mul -le 0){ continue }
+      if($mul -lt 1){ $sp*=$mul; $im=[int][math]::Round($im*$mul); $ck=[int][math]::Round($ck*$mul); $cv=[int][math]::Round($cv*$mul) } }
     $o=GetDay 'google' $d; $o.spend+=$sp;$o.impr+=$im;$o.clicks+=$ck;$o.platLeads+=$cv
     $g=GetGrain 'google' $d (Norm (Cell $r $G_CAMP)) (Norm (Cell $r $G_SET)) (Norm (Cell $r $G_AD))
     $g.spend+=$sp;$g.impr+=$im;$g.clicks+=$ck;$g.platLeads+=$cv } }
@@ -502,6 +563,7 @@ function Build-Funnel($cfg){
         $pst= if($P_STATUS -ge 0 -and $r.Count -gt $P_STATUS){ Deaccent $r[$P_STATUS] } else { '' }
         $pd = if($P_DATE -ge 0 -and $r.Count -gt $P_DATE){ LeadDate $r[$P_DATE] } else { '' }
         if($pm -eq '' -and $pst -eq '' -and $pd -eq ''){ continue }
+        if($dateFrom -ne '' -and $pd -lt $dateFrom){ continue }   # funil com corte de data: so respostas a partir dele
         $done = ($pst -eq 'completed' -or $pst -eq 'complete')
         $survTotal++; if($done){ $survDone++ } elseif($pst -eq 'incomplete'){ $survInc++ }
         # SO classifica quem COMPLETOU (incompletos/em branco nao dao pra pontuar A/B/C e poluiriam)
@@ -599,6 +661,7 @@ function Build-Funnel($cfg){
     foreach($r in $gdRows){
       if($null -eq $r -or $r.Count -le $G_DATA){ continue }
       $gd=LeadDate $r[$G_DATA]; if($gd -eq ''){ continue }
+      if($dateFrom -ne '' -and $gd -lt $dateFrom){ continue }
       $ein = if($G_IN  -ge 0 -and $r.Count -gt $G_IN ){ ToInt $r[$G_IN]  } else { 0 }
       $eout= if($G_OUT -ge 0 -and $r.Count -gt $G_OUT){ ToInt $r[$G_OUT] } else { 0 }
       $grpIn+=$ein; $grpOut+=$eout

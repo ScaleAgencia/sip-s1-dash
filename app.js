@@ -1376,6 +1376,8 @@ function mountV2(){
 
 /* =================== VISÃO DAS PÁGINAS (conversão LP→lead por landing page) =================== */
 var pagesChannel='meta';
+// funil sem gasto Meta (ex.: SIP-L22-2, so Google) abre a aba Paginas direto no Google
+function defaultPagesChannel(){ var m=0; arr(D.byChannel).forEach(function(x){ if(x.ch==='meta') m=+x.spend||0; }); return m>0?'meta':'google'; }
 // conversão da página = leads ÷ VISITAS — padrão da agência: Meta = leads ÷ LPV · Google = leads ÷ cliques (Google não
 // tem LPV). No Geral a base soma LPV do Meta + cliques do Google. É a MESMA régua do Funil, da árvore e da Otimização V2.
 function pgVis(r){ return r.ch==='google' ? (+r.clicks||0) : (+r.lpv||0); }
@@ -1629,7 +1631,7 @@ function mountQualidade(){
 }
 function renderAll(){ var rng=rangeFor(period), a=aggDaily(rng), p=aggDaily(prevRange(rng)), days=daysInRange(rng);
   renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderHotCold(hotColdByDate(rng)); renderDaily(rng); renderTree(rng); mountQualidade();
-  var hc=el('hotColdCard'); if(hc) hc.style.display=(funKey==='l21'||funKey==='l22')?'':'none'; }
+  var hc=el('hotColdCard'); if(hc) hc.style.display=(funKey==='l21'||funKey==='l22'||funKey==='l22b')?'':'none'; }
 var TABS=['funil','micro','v2','pages','leads','perfil','acomp','qualidade','aquec','engaje'];
 /* ---- Aquecimento (L21) · dados via MCP do Meta Ads (snapshot em aquecimento.js) ---- */
 /* Aquecimento do L22 — 2 campanhas (Contagem regressiva + Aquecimento) via MCP do Meta (window.AQUECIMENTO_L22). */
@@ -1786,7 +1788,7 @@ function switchFunnel(key){
   microPath=[]; microMetric='leads'; microPeriod='tudo';
   qualPeriod='tudo'; engPeriod='tudo'; engCustom=null;
   v2Sel={camp:null,adset:null,ad:null}; v2Period='tudo'; v2Channel='geral';
-  pagesChannel='meta';
+  pagesChannel=defaultPagesChannel();
   initFases(); initPeriods(); initEngPeriods(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountV2(); mountPages(); mountAquec(); mountQualidade(); syncL21Tabs();
   if(history.replaceState){ history.replaceState(null,'', location.pathname+'?funnel='+key+(location.hash||'')); }
 }
@@ -1802,5 +1804,5 @@ function initFunnels(){
 }
 
 if(!funnels.length || (!daily.length && !grain.length)){ el('coverage').innerHTML='<b>Sem dados.</b> Rode o build.ps1 para gerar o data.js.'; }
-else { initFunnels(); setFunnelVars(); updateBranding(); initChannels(); initFases(); initPeriods(); initEngPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountV2(); mountPages(); mountAquec(); mountQualidade(); syncL21Tabs(); }
+else { initFunnels(); setFunnelVars(); pagesChannel=defaultPagesChannel(); updateBranding(); initChannels(); initFases(); initPeriods(); initEngPeriods(); initTabs(); initCoverage(); renderAll(); mountLeads(); mountEngage(); mountProfile(); mountGoal(); mountAcomp(); mountMicro(); mountV2(); mountPages(); mountAquec(); mountQualidade(); syncL21Tabs(); }
 })();
