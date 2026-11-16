@@ -1631,7 +1631,7 @@ function mountQualidade(){
 }
 function renderAll(){ var rng=rangeFor(period), a=aggDaily(rng), p=aggDaily(prevRange(rng)), days=daysInRange(rng);
   renderKpiCol(a,p); renderChartLeads(days); renderChartInvest(days); renderHotCold(hotColdByDate(rng)); renderDaily(rng); renderTree(rng); mountQualidade();
-  var hc=el('hotColdCard'); if(hc) hc.style.display=(funKey==='l21'||funKey==='l22'||funKey==='l22b')?'':'none'; }
+  var hc=el('hotColdCard'); if(hc) hc.style.display=(funKey==='l21'||/^l22/.test(funKey))?'':'none'; }
 var TABS=['funil','micro','v2','pages','leads','perfil','acomp','qualidade','aquec','engaje'];
 /* ---- Aquecimento (L21) · dados via MCP do Meta Ads (snapshot em aquecimento.js) ---- */
 /* Aquecimento do L22 — 2 campanhas (Contagem regressiva + Aquecimento) via MCP do Meta (window.AQUECIMENTO_L22). */
