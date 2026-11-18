@@ -37,7 +37,7 @@ $FUNNELS = @(
     tagMust='^SIP-L21$'
     goalSpend=350000; goalDate='2026-09-14' }   # meta de investimento c/ imposto ate 14/09
   [ordered]@{ key='l22'; label='SIP-L22';
-    queriesId='1C0_WLRrdHDA-QLYc--bQ7D_Zueq-NyVd-idp5uEAQSQ'; metaGid='0'; googleGid='1609119011';
+    queriesId='17xTn-w1F3gaJqrgrQjPLqZi2Nt4x1-i0_AUhs2hz7Cc'; metaGid='203'; googleGid='204';   # 18/11: planilha "Extrator" (abas SIP-L22 | META / SIP-L22 | GOOGLE); antes 1C0_WLRrdHDA gid 0/1609119011
     leadsId='1xrHSoS1bg5O8VL22AFv1FY2xuWHnpHrsY_R3lzXhJ70';   leadsGid='1446265479'
     # 11/11: SIP-L22-2 virou funil proprio (l22b) -> aqui so a tag SIP-L22. O gasto das campanhas
     # compartilhadas e dividido por dia x canal pela fatia de leads pagos de cada tag (splitFamily/splitFrom).
@@ -63,7 +63,7 @@ $FUNNELS = @(
   # e corta as queries antes de dateFrom. No dia da virada (09/11) o gasto e dividido com o L22 pela
   # fatia de leads pagos de cada tag (splitFamily/splitFrom) -> L22 + L22-2 = gasto total, sem contar 2x.
   [ordered]@{ key='l22b'; label='SIP-L22-2';
-    queriesId='1C0_WLRrdHDA-QLYc--bQ7D_Zueq-NyVd-idp5uEAQSQ'; metaGid='0'; googleGid='1609119011';
+    queriesId='17xTn-w1F3gaJqrgrQjPLqZi2Nt4x1-i0_AUhs2hz7Cc'; metaGid='203'; googleGid='204';   # 18/11: planilha "Extrator" (abas SIP-L22 | META / SIP-L22 | GOOGLE); antes 1C0_WLRrdHDA gid 0/1609119011
     leadsId='1xrHSoS1bg5O8VL22AFv1FY2xuWHnpHrsY_R3lzXhJ70';   leadsGid='1446265479'
     tagMust='^SIP-L22-2$'
     dateFrom='2026-11-09'
@@ -73,7 +73,7 @@ $FUNNELS = @(
   # 16/11: 3a leva do L22 (tag SIP-L22-3, desde 16/11). Roda no MESMO dia que a L22-2, em campanhas diferentes
   # (1o dia: LPV4_NOVA_LEVA_01 -> /l22-v1) -> a divisao do gasto e por anuncio/campanha (SplitMul).
   [ordered]@{ key='l22c'; label='SIP-L22-3';
-    queriesId='1C0_WLRrdHDA-QLYc--bQ7D_Zueq-NyVd-idp5uEAQSQ'; metaGid='0'; googleGid='1609119011';
+    queriesId='17xTn-w1F3gaJqrgrQjPLqZi2Nt4x1-i0_AUhs2hz7Cc'; metaGid='203'; googleGid='204';   # 18/11: planilha "Extrator" (abas SIP-L22 | META / SIP-L22 | GOOGLE); antes 1C0_WLRrdHDA gid 0/1609119011
     leadsId='1xrHSoS1bg5O8VL22AFv1FY2xuWHnpHrsY_R3lzXhJ70';   leadsGid='1446265479'
     tagMust='^SIP-L22-3$'
     dateFrom='2026-11-16'
