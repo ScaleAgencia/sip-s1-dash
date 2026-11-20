@@ -79,7 +79,7 @@ $FUNNELS = @(
     dateFrom='2026-11-16'
     splitFamily='^SIP-L22(-\d+)?$'; splitFrom='2026-11-09'
     campExclude='\|\s*E3-AQC\s*\|'
-    goalSpend=50000; goalDate='2026-11-23' }   # 20/11: meta corrigida p/ R$ 50 mil ate segunda 23/11 (era 20 mil; card de pacing no topo do Funil)
+    goalSpend=30000; goalDate='2026-11-23' }   # 20/11: meta corrigida p/ R$ 30 mil ate segunda 23/11 (era 20 mil; card de pacing no topo do Funil)
 )
 # teste local: -Only l22b,l22c roda so esses funis (o workflow chama sem -Only = todos)
 if($Only){ $onlyKeys=@($Only -split ',' | ForEach-Object { $_.Trim() }); $FUNNELS=@($FUNNELS | Where-Object { $onlyKeys -contains $_.key }) }
